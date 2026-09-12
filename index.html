@@ -24,7 +24,7 @@
     background: var(--bg);
     color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    padding-bottom:120px;
+    padding-bottom:160px;
   }
   .wrap{max-width:560px;margin:0 auto;padding:0 16px;}
 
@@ -186,6 +186,7 @@
 
       <div class="section-title">Pronostics bonus (saison entière)</div>
       <div class="card">
+        <div id="bonusDeadlineNotice" style="font-size:12.5px;font-weight:700;color:var(--red);margin-bottom:14px;"></div>
         <div class="bonus-field">
           <label>Équipe qui remporte la Ligue des Champions</label>
           <input type="text" id="bonusChampion" placeholder="ex : PSG">
@@ -357,6 +358,12 @@ const DEFAULT_MATCHES = [
   {id:'m8', home:'PSG', away:'Galatasaray', kickoff:'2027-01-27T21:00'},
 ];
 const ADMIN_CODE = 'PsgLuna2026';
+const BONUS_DEADLINE = '2026-09-30T23:59';
+function isBonusLocked(){ return new Date() > new Date(BONUS_DEADLINE); }
+function fmtBonusDeadline(){
+  const d = new Date(BONUS_DEADLINE);
+  return d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+}
 
 let currentName = null;
 let MATCHES = [];
@@ -490,6 +497,12 @@ function enterApp(){
     document.getElementById('bonusChampion').value = bonuses[currentName].champion || '';
     document.getElementById('bonusScorer').value = bonuses[currentName].scorer || '';
   }
+  const locked = isBonusLocked();
+  document.getElementById('bonusChampion').disabled = locked;
+  document.getElementById('bonusScorer').disabled = locked;
+  document.getElementById('bonusDeadlineNotice').textContent = locked
+    ? `Pronostics bonus verrouillés depuis le ${fmtBonusDeadline()}.`
+    : `À remplir avant le ${fmtBonusDeadline()}.`;
   renderMatches();
   renderLeaderboard();
 }
@@ -594,8 +607,10 @@ async function saveAll(){
 
   const champion = document.getElementById('bonusChampion').value.trim();
   const scorer = document.getElementById('bonusScorer').value.trim();
-  bonuses[currentName] = {champion, scorer};
-  try{ await fsSet('bonus:'+currentName, JSON.stringify({champion, scorer})); }catch(e){}
+  if(!isBonusLocked()){
+    bonuses[currentName] = {champion, scorer};
+    try{ await fsSet('bonus:'+currentName, JSON.stringify({champion, scorer})); }catch(e){}
+  }
 
   msg.textContent = 'Pronostics enregistrés !';
   setTimeout(()=>{ msg.textContent=''; }, 2500);
