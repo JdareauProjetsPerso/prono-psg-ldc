@@ -6,16 +6,16 @@
 <title>Prono PSG LDC Copeums</title>
 <style>
   :root{
-    --green: #0E8A4B;
-    --green-deep: #0B5C34;
-    --green-pale: #E8F4EC;
-    --bg: #F5F7F4;
+    --green: #0B2265;
+    --green-deep: #071A4D;
+    --green-pale: #E8ECF7;
+    --bg: #F5F6F8;
     --card: #FFFFFF;
-    --ink: #10231A;
-    --muted: #6B7C72;
+    --ink: #10131F;
+    --muted: #6B7080;
     --gold: #F2A900;
-    --line: #E3EBE5;
-    --red: #D93A3A;
+    --line: #E3E5EC;
+    --red: #DA1128;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;}
@@ -35,6 +35,8 @@
     border-radius: 0 0 18px 18px;
   }
   header.top .inner{max-width:560px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top .brand{display:flex;align-items:center;gap:10px;}
+  header.top .ball{flex-shrink:0;}
   header.top h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.01em;}
   header.top p{margin:4px 0 0;font-size:13px;opacity:0.85;}
   .who{text-align:right;font-size:12.5px;}
@@ -82,8 +84,13 @@
 
   .card{background: var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow: 0 1px 6px rgba(16,35,26,0.05);}
   .card .date{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:8px;}
-  .card .teams{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:700;}
-  .card .teams .vs{color:var(--muted);font-weight:500;font-size:12px;padding:0 8px;}
+  .card .teams{display:flex;justify-content:space-between;align-items:center;font-size:15px;font-weight:700;}
+  .card .teams .vs{color:var(--muted);font-weight:500;font-size:12px;padding:0 6px;flex-shrink:0;}
+  .team-side{display:flex;align-items:center;gap:7px;min-width:0;}
+  .team-badge{
+    display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:26px;height:26px;border-radius:50%;font-size:9.5px;font-weight:800;letter-spacing:0.02em;
+  }
   .pred-row{margin-top:12px;display:flex;align-items:center;gap:8px;}
   .pred-row .lbl{flex:1;font-size:12.5px;color:var(--muted);font-weight:600;}
   .pred-row input{width:52px;text-align:center;padding:9px 4px;font-weight:700;}
@@ -100,7 +107,7 @@
   .bonus-field label{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;display:block;}
   .bonus-field{margin-bottom:14px;}
 
-  .save-bar{position:sticky;bottom:78px;padding:14px 0 4px;}
+  .save-bar{padding:14px 0 4px;}
   .msg{text-align:center;font-size:13px;font-weight:700;color:var(--green-deep);min-height:16px;margin-top:8px;}
 
   table.leader{width:100%;border-collapse:collapse;font-size:13.5px;}
@@ -154,7 +161,15 @@
   <header class="top">
     <div class="inner">
       <div>
-        <h1>PSG LDC Copeums</h1>
+        <div class="brand">
+          <svg class="ball" width="28" height="28" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="14.5" fill="#fff"/>
+            <circle cx="16" cy="16" r="14.5" fill="none" stroke="#10131F" stroke-width="1.2"/>
+            <polygon points="16,9 20.5,12.3 18.8,17.5 13.2,17.5 11.5,12.3" fill="#10131F"/>
+            <path d="M16 9 L16 3.5 M20.5 12.3 L27 10.2 M18.8 17.5 L22 25 M13.2 17.5 L10 25 M11.5 12.3 L5 10.2" stroke="#10131F" stroke-width="1.1" fill="none"/>
+          </svg>
+          <h1>PSG LDC Copeums</h1>
+        </div>
         <p>Ligue des Champions 2026/27</p>
       </div>
       <div class="who">
@@ -497,6 +512,25 @@ function isLocked(m){
   return { locked: !!final || kickoffPassed, final, kickoffPassed };
 }
 
+const TEAM_STYLE = {
+  'PSG': {abbr:'PSG', bg:'#0B2265', fg:'#fff'},
+  'Slovan Bratislava': {abbr:'SLB', bg:'#0033A0', fg:'#fff'},
+  'Manchester City': {abbr:'MCI', bg:'#6CABDD', fg:'#10131F'},
+  'FC Barcelone': {abbr:'FCB', bg:'#A50044', fg:'#fff'},
+  'Villarreal': {abbr:'VIL', bg:'#FFE667', fg:'#10131F'},
+  'AS Roma': {abbr:'ROM', bg:'#8E1F2F', fg:'#fff'},
+  'Aston Villa': {abbr:'AVL', bg:'#670E36', fg:'#fff'},
+  'Côme': {abbr:'COM', bg:'#0B5FA5', fg:'#fff'},
+  'Galatasaray': {abbr:'GAL', bg:'#A90432', fg:'#FFCC00'},
+};
+function teamBadge(name){
+  const t = TEAM_STYLE[name];
+  const bg = t ? t.bg : '#6B7080';
+  const fg = t ? t.fg : '#fff';
+  const abbr = t ? t.abbr : name.split(' ').map(w=>w[0]).join('').slice(0,3).toUpperCase();
+  return `<span class="team-badge" style="background:${bg};color:${fg};">${abbr}</span>`;
+}
+
 function renderMatches(){
   const el = document.getElementById('matches');
   el.innerHTML = '';
@@ -506,7 +540,7 @@ function renderMatches(){
     const div = document.createElement('div');
     div.className = 'card';
     let html = `<div class="date">${fmtKickoff(m.kickoff)}</div>
-      <div class="teams"><span>${m.home}</span><span class="vs">vs</span><span>${m.away}</span></div>`;
+      <div class="teams"><span class="team-side">${teamBadge(m.home)}${m.home}</span><span class="vs">vs</span><span class="team-side">${teamBadge(m.away)}${m.away}</span></div>`;
 
     html += `<div class="pred-row">
       <span class="lbl">Ton pronostic</span>
@@ -520,19 +554,7 @@ function renderMatches(){
       html += `<span class="locked-tag">Verrouillé</span>`;
     } else if(kickoffPassed){
       html += `<span class="locked-tag">Verrouillé — coup d'envoi passé</span>`;
-      if(adminUnlocked){
-        html += `<div class="admin-row">
-          <input type="number" min="0" id="final-${m.id}-h" placeholder="0">
-          <span>—</span>
-          <input type="number" min="0" id="final-${m.id}-a" placeholder="0">
-          <button onclick="enterFinal('${m.id}')">Enregistrer le score</button>
-        </div>
-        <div class="msg" id="finalMsg-${m.id}" style="text-align:left;"></div>`;
-      } else {
-        html += `<div class="admin-row" style="border-top:1px dashed var(--line);padding-top:10px;font-size:12px;color:var(--muted);">
-          Organisateur ? Déverrouille le mode admin dans l'onglet Backoffice pour entrer le score.
-        </div>`;
-      }
+      html += `<div style="margin-top:8px;font-size:12px;color:var(--muted);">Le score sera ajouté par l'organisateur.</div>`;
     }
     div.innerHTML = html;
     el.appendChild(div);
@@ -646,7 +668,7 @@ function renderBackoffice(){
   const el = document.getElementById('boMatches');
   el.innerHTML = '';
   for(const m of MATCHES){
-    const {locked} = isLocked(m);
+    const {locked, final, kickoffPassed} = isLocked(m);
     const div = document.createElement('div');
     div.className = 'card';
     div.innerHTML = `
@@ -662,6 +684,16 @@ function renderBackoffice(){
       <div class="bo-actions">
         <button onclick="boSaveMatch('${m.id}')">Enregistrer</button>
         <button class="danger" onclick="boDeleteMatch('${m.id}')">${pendingDeleteId === m.id ? 'Confirmer la suppression ?' : 'Supprimer'}</button>
+      </div>
+      <div class="field" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px;">
+        <label>Score final</label>
+        <div class="bo-row">
+          <input type="number" min="0" id="final-${m.id}-h" placeholder="0" value="${final ? final.h : ''}">
+          <input type="number" min="0" id="final-${m.id}-a" placeholder="0" value="${final ? final.a : ''}">
+        </div>
+        <button style="margin-top:8px;" onclick="enterFinal('${m.id}')">${final ? 'Modifier le score' : 'Enregistrer le score'}</button>
+        <div class="msg" id="finalMsg-${m.id}"></div>
+        ${!kickoffPassed ? '<div class="locked-badge">Coup d\'envoi pas encore passé — à utiliser une fois le match terminé.</div>' : ''}
       </div>
     `;
     el.appendChild(div);
