@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prono PSG LDC Copeums</title>
+<style>
+  :root{
+    --green: #0E8A4B;
+    --green-deep: #0B5C34;
+    --green-pale: #E8F4EC;
+    --bg: #F5F7F4;
+    --card: #FFFFFF;
+    --ink: #10231A;
+    --muted: #6B7C72;
+    --gold: #F2A900;
+    --line: #E3EBE5;
+    --red: #D93A3A;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    padding-bottom:78px;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 16px;}
+
+  header.top{
+    background: var(--green);
+    color:#fff;
+    padding:20px 16px 22px;
+    border-radius: 0 0 18px 18px;
+  }
+  header.top .inner{max-width:560px;margin:0 auto;display:flex;justify-content:space-between;align-items:flex-start;}
+  header.top h1{margin:0;font-size:22px;font-weight:800;letter-spacing:-0.01em;}
+  header.top p{margin:4px 0 0;font-size:13px;opacity:0.85;}
+  .who{text-align:right;font-size:12.5px;}
+  .who .name{font-weight:700;display:block;}
+  .who button{
+    margin-top:6px;background: rgba(255,255,255,0.18);border:none;color:#fff;
+    padding:5px 10px;border-radius:20px;font-size:11.5px;cursor:pointer;
+  }
+
+  #auth{max-width:400px;margin:60px auto 0;padding:0 20px;}
+  .auth-card{background: var(--card);border-radius:16px;padding:26px 22px;box-shadow: 0 2px 14px rgba(16,35,26,0.06);}
+  .auth-card h2{margin:0 0 4px;font-size:20px;}
+  .auth-card .sub{color:var(--muted);font-size:13.5px;margin-bottom:20px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+  input[type=text], input[type=password], input[type=number], input[type=datetime-local]{
+    width:100%;background: var(--bg);border:1.5px solid var(--line);color: var(--ink);
+    padding:12px 13px;font-size:15px;border-radius:10px;font-family:inherit;
+  }
+  input:focus{outline:none;border-color:var(--green);}
+  button{
+    font-family:inherit;font-weight:700;font-size:14.5px;background: var(--green);color:#fff;
+    border:none;padding:12px 18px;border-radius:10px;cursor:pointer;width:100%;
+  }
+  button.ghost{background:transparent;color:var(--green);border:1.5px solid var(--green);}
+  button.small{width:auto;padding:9px 14px;font-size:13px;}
+  button.danger{background:var(--red);}
+  .switch{text-align:center;margin-top:14px;font-size:13px;color: var(--muted);}
+  .error{color:var(--red);font-size:13px;margin-top:8px;min-height:16px;}
+
+  .tabbar{
+    position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);
+    display:flex;padding:8px 12px calc(8px + env(safe-area-inset-bottom));z-index:10;
+  }
+  .tabbar button{flex:1;background:none;color: var(--muted);font-weight:700;font-size:11.5px;padding:8px 2px;border-radius:10px;}
+  .tabbar button.active{color:var(--green); background: var(--green-pale);}
+
+  .view{display:none;padding-top:18px;}
+  .view.active{display:block;}
+
+  .section-title{
+    font-size:13px;font-weight:800;letter-spacing:0.02em;color: var(--muted);
+    text-transform:uppercase;margin: 22px 2px 10px;
+  }
+
+  .card{background: var(--card);border-radius:14px;padding:14px 16px;margin-bottom:10px;box-shadow: 0 1px 6px rgba(16,35,26,0.05);}
+  .card .date{font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:8px;}
+  .card .teams{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:700;}
+  .card .teams .vs{color:var(--muted);font-weight:500;font-size:12px;padding:0 8px;}
+  .pred-row{margin-top:12px;display:flex;align-items:center;gap:8px;}
+  .pred-row .lbl{flex:1;font-size:12.5px;color:var(--muted);font-weight:600;}
+  .pred-row input{width:52px;text-align:center;padding:9px 4px;font-weight:700;}
+  .pred-row input:disabled{background:var(--green-pale);border-color:var(--green-pale);color:var(--green-deep);}
+  .locked-tag{
+    display:inline-block;margin-top:8px;background: var(--green-pale); color: var(--green-deep);
+    font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:20px;
+  }
+  .final-note{margin-top:8px;font-size:13px;font-weight:700;color:var(--green-deep);}
+  .admin-row{margin-top:10px;display:flex;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:10px;}
+  .admin-row input{width:52px;text-align:center;padding:8px 4px;}
+  .admin-row button{width:auto;padding:8px 12px;font-size:12.5px;background:var(--ink);}
+
+  .bonus-field label{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:6px;display:block;}
+  .bonus-field{margin-bottom:14px;}
+
+  .save-bar{position:sticky;bottom:78px;padding:14px 0 4px;}
+  .msg{text-align:center;font-size:13px;font-weight:700;color:var(--green-deep);min-height:16px;margin-top:8px;}
+
+  table.leader{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.leader th{text-align:left;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;padding:8px 6px;border-bottom:1.5px solid var(--line);}
+  table.leader td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:top;}
+  table.leader td.rank{font-weight:800;color:var(--muted);width:22px;}
+  tr.top1 td.rank{color:var(--gold);}
+  table.leader td.name{font-weight:700;}
+  table.leader td.picks{font-size:12px;color:var(--muted);line-height:1.5;}
+  table.leader td.pts{font-weight:800;text-align:right;color:var(--green-deep);white-space:nowrap;}
+  .empty{font-size:13.5px;color:var(--muted);padding:16px 4px;text-align:center;}
+  .rules-card{font-size:12.5px;color:var(--muted);}
+  .rules-card div{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line);}
+  .rules-card div:last-child{border-bottom:none;}
+  .ex-label{font-size:14.5px;font-weight:800;display:flex;justify-content:space-between;align-items:center;}
+  .ex-pts{background:var(--green-pale);color:var(--green-deep);font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;}
+  .ex-sub{font-size:12.5px;color:var(--muted);margin-top:4px;margin-bottom:10px;}
+  .ex-row{display:flex;justify-content:space-between;font-size:13.5px;padding:4px 0;color:var(--muted);}
+  .ex-val{font-weight:700;color:var(--ink);}
+  .ex-why{font-size:12px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
+
+  .bo-row{display:flex;gap:8px;margin-bottom:8px;}
+  .bo-row input{flex:1;}
+  .bo-actions{display:flex;gap:8px;margin-top:8px;}
+  .bo-actions button{flex:1;}
+  .locked-badge{font-size:11px;color:var(--muted);margin-top:4px;}
+  .gate-note{font-size:12.5px;color:var(--muted);text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+
+<div id="auth">
+  <div class="auth-card">
+    <h2 id="authTitle">Connexion</h2>
+    <p class="sub" id="authSub">Entre ton prénom et ton mot de passe.</p>
+    <div class="field">
+      <label>Prénom</label>
+      <input type="text" id="authName" placeholder="ex : Julien">
+    </div>
+    <div class="field">
+      <label>Mot de passe</label>
+      <input type="password" id="authPass" placeholder="••••••••">
+    </div>
+    <button onclick="submitAuth()">Continuer</button>
+    <div class="error" id="authError"></div>
+    <div class="switch">Première visite ? Tape juste un prénom et un mot de passe, ça crée ton compte automatiquement.</div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header class="top">
+    <div class="inner">
+      <div>
+        <h1>PSG LDC Copeums</h1>
+        <p>Ligue des Champions 2026/27</p>
+      </div>
+      <div class="who">
+        <span class="name" id="whoName"></span>
+        <button onclick="logout()">Déconnexion</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="view-pronos" class="view active">
+      <div class="section-title">Les matchs</div>
+      <div id="matches"></div>
+
+      <div class="section-title">Pronostics bonus (saison entière)</div>
+      <div class="card">
+        <div class="bonus-field">
+          <label>Équipe qui remporte la Ligue des Champions</label>
+          <input type="text" id="bonusChampion" placeholder="ex : PSG">
+        </div>
+        <div class="bonus-field" style="margin-bottom:0;">
+          <label>Meilleur buteur de la Ligue des Champions</label>
+          <input type="text" id="bonusScorer" placeholder="ex : Ousmane Dembélé">
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <button onclick="saveAll()">Enregistrer mes pronostics</button>
+        <div class="msg" id="saveMsg"></div>
+      </div>
+    </div>
+
+    <div id="view-regles" class="view">
+      <div class="section-title">Barème des points</div>
+      <div class="card rules-card">
+        <div><span>Bon vainqueur</span><span>1 pt</span></div>
+        <div><span>Bon vainqueur + score exact</span><span>2 pts</span></div>
+        <div><span>Bon vainqueur + bonne différence de buts</span><span>1,5 pt</span></div>
+        <div><span>Mauvais pronostic</span><span>0 pt</span></div>
+        <div><span>Équipe victorieuse de la Ligue des Champions</span><span>5 pts</span></div>
+        <div><span>Meilleur buteur de la Ligue des Champions</span><span>5 pts</span></div>
+      </div>
+
+      <div class="section-title">Ce que ça veut dire, en exemples</div>
+
+      <div class="card">
+        <div class="ex-label">Score exact <span class="ex-pts">2 pts</span></div>
+        <div class="ex-sub">Tu as trouvé le score du match, au but près.</div>
+        <div class="ex-row"><span>Ton prono</span><span class="ex-val">PSG 2 – 1 Roma</span></div>
+        <div class="ex-row"><span>Score final</span><span class="ex-val">PSG 2 – 1 Roma</span></div>
+      </div>
+
+      <div class="card">
+        <div class="ex-label">Bonne différence de buts <span class="ex-pts">1,5 pt</span></div>
+        <div class="ex-sub">Tu as le bon vainqueur et le bon écart de buts, mais pas le score exact.</div>
+        <div class="ex-row"><span>Ton prono</span><span class="ex-val">PSG 2 – 1 Roma</span></div>
+        <div class="ex-row"><span>Score final</span><span class="ex-val">PSG 3 – 2 Roma</span></div>
+        <div class="ex-why">Dans les deux cas : PSG gagne avec 1 but d'écart.</div>
+      </div>
+
+      <div class="card">
+        <div class="ex-label">Bon vainqueur <span class="ex-pts">1 pt</span></div>
+        <div class="ex-sub">Tu as juste sur qui gagne (ou sur le match nul), mais ni le score ni l'écart.</div>
+        <div class="ex-row"><span>Ton prono</span><span class="ex-val">PSG 1 – 0 Roma</span></div>
+        <div class="ex-row"><span>Score final</span><span class="ex-val">PSG 3 – 1 Roma</span></div>
+        <div class="ex-why">PSG gagne dans les deux cas, mais pas avec le même écart.</div>
+      </div>
+
+      <div class="card">
+        <div class="ex-label">Mauvais pronostic <span class="ex-pts">0 pt</span></div>
+        <div class="ex-sub">Tu t'es trompé sur le résultat (victoire, défaite ou nul).</div>
+        <div class="ex-row"><span>Ton prono</span><span class="ex-val">PSG 1 – 0 Roma</span></div>
+        <div class="ex-row"><span>Score final</span><span class="ex-val">PSG 1 – 1 Roma</span></div>
+        <div class="ex-why">Tu avais donné PSG vainqueur, le match s'est terminé nul.</div>
+      </div>
+
+      <div class="card">
+        <div class="ex-label">Pronostics bonus <span class="ex-pts">5 pts chacun</span></div>
+        <div class="ex-sub">À part des 8 matchs de poule, deux pronostics valables pour toute la saison :</div>
+        <div class="ex-row"><span>Équipe qui remporte la Ligue des Champions</span></div>
+        <div class="ex-row"><span>Meilleur buteur de la compétition</span></div>
+        <div class="ex-why">Ces points ne sont attribués qu'à la toute fin de la Ligue des Champions, une fois le vainqueur et le meilleur buteur connus. Un seul essai chacun, pas de score exact ni de bonus partiel : soit tu as trouvé, soit non.</div>
+      </div>
+    </div>
+
+    <div id="view-classement" class="view">
+      <div class="section-title">Classement général</div>
+      <div class="card" style="padding:6px 10px;">
+        <div id="leaderboard"></div>
+      </div>
+    </div>
+
+    <div id="view-backoffice" class="view">
+      <div class="section-title">Backoffice — gérer les matchs</div>
+      <div id="boGate" class="card gate-note">
+        Accès protégé.<br><br>
+        <div class="field" style="text-align:left;">
+          <label>Code organisateur</label>
+          <input type="password" id="boCodeInput" placeholder="••••••••">
+        </div>
+        <button onclick="unlockBackoffice()">Déverrouiller</button>
+        <div class="msg" id="boGateMsg"></div>
+      </div>
+      <div id="boContent" style="display:none;">
+        <div class="msg" id="boGlobalMsg"></div>
+        <div id="boMatches"></div>
+
+        <div class="section-title">Réinitialiser un mot de passe</div>
+        <div class="card">
+          <div class="field">
+            <label>Joueur</label>
+            <select id="boResetPlayer" style="width:100%;background:var(--bg);border:1.5px solid var(--line);color:var(--ink);padding:12px 13px;font-size:15px;border-radius:10px;font-family:inherit;"></select>
+          </div>
+          <div class="field">
+            <label>Nouveau mot de passe</label>
+            <input type="text" id="boResetPass" placeholder="ex : psg1234">
+          </div>
+          <button onclick="boResetPassword()">Réinitialiser</button>
+          <div class="msg" id="boResetMsg"></div>
+        </div>
+
+        <div class="section-title">Ajouter un match</div>
+        <div class="card">
+          <div class="bo-row">
+            <input type="text" id="boNewHome" placeholder="Équipe à domicile">
+            <input type="text" id="boNewAway" placeholder="Équipe à l'extérieur">
+          </div>
+          <div class="field">
+            <label>Date et heure du coup d'envoi (heure de Paris)</label>
+            <input type="datetime-local" id="boNewKickoff">
+          </div>
+          <button onclick="boAddMatch()">Ajouter le match</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="tabbar" id="tabbar" style="display:none;">
+  <button id="tab-pronos" class="active" onclick="showView('pronos')">Pronostics</button>
+  <button id="tab-classement" onclick="showView('classement')">Classement</button>
+  <button id="tab-regles" onclick="showView('regles')">Règles</button>
+  <button id="tab-backoffice" onclick="showView('backoffice')">Backoffice</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script>
+// ---- Firebase setup ----
+const firebaseConfig = {
+  apiKey: "AIzaSyAuZy1Rh3KOg5Nk5tCw5xWVVQ8WNInm84A",
+  authDomain: "prono-psg-ldc.firebaseapp.com",
+  projectId: "prono-psg-ldc",
+  storageBucket: "prono-psg-ldc.firebasestorage.app",
+  messagingSenderId: "611320342026",
+  appId: "1:611320342026:web:d90c0459b31b9aa1e7e1f3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const COLLECTION = 'prono_data';
+
+async function fsGet(key){
+  const snap = await db.collection(COLLECTION).doc(key).get();
+  if(!snap.exists) return null;
+  return snap.data().value;
+}
+async function fsSet(key, value){
+  await db.collection(COLLECTION).doc(key).set({value, updatedAt: Date.now()});
+  return true;
+}
+async function fsDelete(key){
+  await db.collection(COLLECTION).doc(key).delete();
+  return true;
+}
+
+const DEFAULT_MATCHES = [
+  {id:'m1', home:'PSG', away:'Slovan Bratislava', kickoff:'2026-09-09T21:00'},
+  {id:'m2', home:'Manchester City', away:'PSG', kickoff:'2026-10-14T21:00'},
+  {id:'m3', home:'PSG', away:'FC Barcelone', kickoff:'2026-10-20T21:00'},
+  {id:'m4', home:'Villarreal', away:'PSG', kickoff:'2026-11-03T21:00'},
+  {id:'m5', home:'PSG', away:'AS Roma', kickoff:'2026-11-25T21:00'},
+  {id:'m6', home:'Aston Villa', away:'PSG', kickoff:'2026-12-08T21:00'},
+  {id:'m7', home:'Côme', away:'PSG', kickoff:'2027-01-20T21:00'},
+  {id:'m8', home:'PSG', away:'Galatasaray', kickoff:'2027-01-27T21:00'},
+];
+const ADMIN_CODE = 'PsgLuna2026';
+
+let currentName = null;
+let MATCHES = [];
+let scores = {};
+let predictions = {};
+let bonuses = {};
+let players = [];
+let adminUnlocked = false;
+let pendingDeleteId = null;
+
+function simpleHashHex(text){
+  // Fallback hash (used only if Web Crypto isn't available in this context).
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for(let i=0;i<text.length;i++){
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
+  return (h1>>>0).toString(16).padStart(8,'0') + (h2>>>0).toString(16).padStart(8,'0');
+}
+
+async function sha256Hex(text){
+  try{
+    if(window.crypto && window.crypto.subtle && window.crypto.subtle.digest){
+      const enc = new TextEncoder().encode(text);
+      const buf = await window.crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){ /* fall through to fallback */ }
+  return simpleHashHex(text);
+}
+
+function fmtKickoff(iso){
+  const d = new Date(iso);
+  const day = d.toLocaleDateString('fr-FR', {weekday:'short', day:'numeric', month:'short'});
+  const h = String(d.getHours()).padStart(2,'0');
+  const m = String(d.getMinutes()).padStart(2,'0');
+  return `${day} — ${h}h${m}`;
+}
+
+async function init(){
+  await loadShared();
+  let session = null;
+  try{ session = localStorage.getItem('prono_session'); }catch(e){ session = null; }
+  if(session && players.includes(session)){
+    currentName = session;
+    enterApp();
+  }
+}
+
+async function loadShared(){
+  try{
+    const mm = await fsGet('matches');
+    MATCHES = mm ? JSON.parse(mm) : null;
+  }catch(e){ MATCHES = null; }
+  if(!MATCHES || MATCHES.length === 0){
+    MATCHES = DEFAULT_MATCHES;
+    try{ await fsSet('matches', JSON.stringify(MATCHES)); }catch(e){}
+  }
+
+  try{ const s = await fsGet('scores'); scores = s ? JSON.parse(s) : {}; }
+  catch(e){ scores = {}; }
+  try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
+  catch(e){ players = []; }
+
+  predictions = {}; bonuses = {};
+  for(const name of players){
+    try{ const b = await fsGet('bonus:'+name); if(b) bonuses[name] = JSON.parse(b); }catch(e){}
+    for(const m of MATCHES){
+      try{ const pr = await fsGet('pred:'+name+':'+m.id); if(pr) predictions[name+'|'+m.id] = JSON.parse(pr); }catch(e){}
+    }
+  }
+}
+
+async function submitAuth(){
+  const nameRaw = document.getElementById('authName').value.trim();
+  const pass = document.getElementById('authPass').value;
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  if(!nameRaw || !pass){ errEl.textContent = 'Entre un prénom et un mot de passe.'; return; }
+
+  try{
+    const key = 'user:' + nameRaw.toLowerCase();
+    const hash = await sha256Hex(pass);
+
+    let record = null;
+    try{ const r = await fsGet(key); record = r ? JSON.parse(r) : null; }
+    catch(e){ record = null; }
+
+    if(record){
+      if(record.hash !== hash){ errEl.textContent = 'Mot de passe incorrect pour ce prénom.'; return; }
+      currentName = record.name;
+    } else {
+      const ok = await fsSet(key, JSON.stringify({name: nameRaw, hash}));
+      if(!ok){ errEl.textContent = "Impossible de créer le compte, réessaie."; return; }
+      currentName = nameRaw;
+      if(!players.includes(nameRaw)){
+        players.push(nameRaw);
+        try{ await fsSet('players', JSON.stringify(players)); }catch(e){}
+      }
+    }
+
+    try{ localStorage.setItem('prono_session', currentName); }catch(e){}
+    await loadShared();
+    enterApp();
+  }catch(e){
+    const raw = e && e.message ? e.message : 'inconnue';
+    errEl.textContent = "Une erreur est survenue (" + raw + "). Vérifie ta connexion et réessaie.";
+  }
+}
+
+function logout(){
+  try{ localStorage.removeItem('prono_session'); }catch(e){}
+  currentName = null;
+  adminUnlocked = false;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('tabbar').style.display = 'none';
+  document.getElementById('auth').style.display = 'block';
+  document.getElementById('authName').value = '';
+  document.getElementById('authPass').value = '';
+}
+
+function enterApp(){
+  document.getElementById('auth').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('tabbar').style.display = 'flex';
+  document.getElementById('whoName').textContent = currentName;
+  if(bonuses[currentName]){
+    document.getElementById('bonusChampion').value = bonuses[currentName].champion || '';
+    document.getElementById('bonusScorer').value = bonuses[currentName].scorer || '';
+  }
+  renderMatches();
+  renderLeaderboard();
+}
+
+function showView(v){
+  document.getElementById('view-pronos').classList.toggle('active', v==='pronos');
+  document.getElementById('view-classement').classList.toggle('active', v==='classement');
+  document.getElementById('view-regles').classList.toggle('active', v==='regles');
+  document.getElementById('view-backoffice').classList.toggle('active', v==='backoffice');
+  document.getElementById('tab-pronos').classList.toggle('active', v==='pronos');
+  document.getElementById('tab-classement').classList.toggle('active', v==='classement');
+  document.getElementById('tab-regles').classList.toggle('active', v==='regles');
+  document.getElementById('tab-backoffice').classList.toggle('active', v==='backoffice');
+  if(v==='classement'){ renderLeaderboard(); }
+  if(v==='backoffice'){ renderBackoffice(); }
+}
+
+function isLocked(m){
+  const final = scores[m.id];
+  const kickoffPassed = new Date(m.kickoff) <= new Date();
+  return { locked: !!final || kickoffPassed, final, kickoffPassed };
+}
+
+function renderMatches(){
+  const el = document.getElementById('matches');
+  el.innerHTML = '';
+  for(const m of MATCHES){
+    const {locked, final, kickoffPassed} = isLocked(m);
+    const myPred = currentName ? predictions[currentName+'|'+m.id] : null;
+    const div = document.createElement('div');
+    div.className = 'card';
+    let html = `<div class="date">${fmtKickoff(m.kickoff)}</div>
+      <div class="teams"><span>${m.home}</span><span class="vs">vs</span><span>${m.away}</span></div>`;
+
+    html += `<div class="pred-row">
+      <span class="lbl">Ton pronostic</span>
+      <input type="number" min="0" id="pred-${m.id}-h" value="${myPred ? myPred.h : ''}" ${locked ? 'disabled' : ''}>
+      <span>—</span>
+      <input type="number" min="0" id="pred-${m.id}-a" value="${myPred ? myPred.a : ''}" ${locked ? 'disabled' : ''}>
+    </div>`;
+
+    if(final){
+      html += `<div class="final-note">Score final : ${m.home} ${final.h} — ${final.a} ${m.away}</div>`;
+      html += `<span class="locked-tag">Verrouillé</span>`;
+    } else if(kickoffPassed){
+      html += `<span class="locked-tag">Verrouillé — coup d'envoi passé</span>`;
+      if(adminUnlocked){
+        html += `<div class="admin-row">
+          <input type="number" min="0" id="final-${m.id}-h" placeholder="0">
+          <span>—</span>
+          <input type="number" min="0" id="final-${m.id}-a" placeholder="0">
+          <button onclick="enterFinal('${m.id}')">Enregistrer le score</button>
+        </div>
+        <div class="msg" id="finalMsg-${m.id}" style="text-align:left;"></div>`;
+      } else {
+        html += `<div class="admin-row" style="border-top:1px dashed var(--line);padding-top:10px;font-size:12px;color:var(--muted);">
+          Organisateur ? Déverrouille le mode admin dans l'onglet Backoffice pour entrer le score.
+        </div>`;
+      }
+    }
+    div.innerHTML = html;
+    el.appendChild(div);
+  }
+}
+
+async function enterFinal(matchId){
+  if(!adminUnlocked) return;
+  const msgEl = document.getElementById('finalMsg-'+matchId);
+  const h = document.getElementById('final-'+matchId+'-h').value;
+  const a = document.getElementById('final-'+matchId+'-a').value;
+  if(h === '' || a === ''){ if(msgEl) msgEl.textContent = 'Entre les deux scores.'; return; }
+  scores[matchId] = {h: parseInt(h), a: parseInt(a)};
+  try{ await fsSet('scores', JSON.stringify(scores)); }
+  catch(e){ if(msgEl) msgEl.textContent = "Erreur d'enregistrement, réessaie."; return; }
+  renderMatches();
+  renderLeaderboard();
+}
+
+async function saveAll(){
+  if(!currentName){ return; }
+  const msg = document.getElementById('saveMsg');
+  msg.textContent = 'Enregistrement…';
+
+  for(const m of MATCHES){
+    const {locked} = isLocked(m);
+    if(locked) continue;
+    const hEl = document.getElementById('pred-'+m.id+'-h');
+    const aEl = document.getElementById('pred-'+m.id+'-a');
+    if(hEl && aEl && hEl.value !== '' && aEl.value !== ''){
+      const val = {h: parseInt(hEl.value), a: parseInt(aEl.value)};
+      predictions[currentName+'|'+m.id] = val;
+      try{ await fsSet('pred:'+currentName+':'+m.id, JSON.stringify(val)); }catch(e){}
+    }
+  }
+
+  const champion = document.getElementById('bonusChampion').value.trim();
+  const scorer = document.getElementById('bonusScorer').value.trim();
+  bonuses[currentName] = {champion, scorer};
+  try{ await fsSet('bonus:'+currentName, JSON.stringify({champion, scorer})); }catch(e){}
+
+  msg.textContent = 'Pronostics enregistrés !';
+  setTimeout(()=>{ msg.textContent=''; }, 2500);
+  renderLeaderboard();
+}
+
+function pointsForMatch(pred, final){
+  if(!pred || !final) return 0;
+  const predDiff = pred.h - pred.a;
+  const finalDiff = final.h - final.a;
+  if(Math.sign(predDiff) !== Math.sign(finalDiff)) return 0;
+  if(pred.h === final.h && pred.a === final.a) return 2;
+  if(predDiff === finalDiff) return 1.5;
+  return 1;
+}
+
+function renderLeaderboard(){
+  const el = document.getElementById('leaderboard');
+  if(players.length === 0){
+    el.innerHTML = '<div class="empty">Personne n\'a encore pronostiqué. Sois le premier !</div>';
+    return;
+  }
+  const rows = players.map(name=>{
+    let pts = 0;
+    for(const m of MATCHES){
+      const final = scores[m.id];
+      if(!final) continue;
+      pts += pointsForMatch(predictions[name+'|'+m.id], final);
+    }
+    const b = bonuses[name] || {};
+    return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—'};
+  });
+  rows.sort((a,b)=> b.pts - a.pts);
+  let html = `<table class="leader"><thead><tr>
+    <th></th><th>Joueur</th><th>Pronos bonus</th><th style="text-align:right;">Pts</th>
+  </tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    html += `<tr class="${i===0 ? 'top1' : ''}">
+      <td class="rank">${i+1}</td>
+      <td class="name">${r.name}</td>
+      <td class="picks">Vainqueur : ${r.champion}<br>Buteur : ${r.scorer}</td>
+      <td class="pts">${r.pts}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function unlockBackoffice(){
+  const code = document.getElementById('boCodeInput').value;
+  const msg = document.getElementById('boGateMsg');
+  if(code !== ADMIN_CODE){ msg.textContent = 'Code incorrect.'; return; }
+  msg.textContent = '';
+  adminUnlocked = true;
+  renderBackoffice();
+  renderMatches();
+}
+
+function isoToLocalInputValue(iso){
+  return iso.length >= 16 ? iso.slice(0,16) : iso;
+}
+
+function renderBackoffice(){
+  document.getElementById('boGate').style.display = adminUnlocked ? 'none' : 'block';
+  document.getElementById('boContent').style.display = adminUnlocked ? 'block' : 'none';
+  if(!adminUnlocked) return;
+
+  const sel = document.getElementById('boResetPlayer');
+  sel.innerHTML = players.map(p => `<option value="${p}">${p}</option>`).join('');
+
+  const el = document.getElementById('boMatches');
+  el.innerHTML = '';
+  for(const m of MATCHES){
+    const {locked} = isLocked(m);
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+      <div class="bo-row">
+        <input type="text" id="bo-home-${m.id}" value="${m.home}">
+        <input type="text" id="bo-away-${m.id}" value="${m.away}">
+      </div>
+      <div class="field">
+        <label>Date et heure du coup d'envoi (heure de Paris)</label>
+        <input type="datetime-local" id="bo-kickoff-${m.id}" value="${isoToLocalInputValue(m.kickoff)}">
+      </div>
+      ${locked ? '<div class="locked-badge">Ce match est déjà verrouillé pour les joueurs (score entré ou coup d\'envoi passé).</div>' : ''}
+      <div class="bo-actions">
+        <button onclick="boSaveMatch('${m.id}')">Enregistrer</button>
+        <button class="danger" onclick="boDeleteMatch('${m.id}')">${pendingDeleteId === m.id ? 'Confirmer la suppression ?' : 'Supprimer'}</button>
+      </div>
+    `;
+    el.appendChild(div);
+  }
+}
+
+async function boSaveMatch(id){
+  const home = document.getElementById('bo-home-'+id).value.trim();
+  const away = document.getElementById('bo-away-'+id).value.trim();
+  const kickoff = document.getElementById('bo-kickoff-'+id).value;
+  const msgEl = document.getElementById('boGlobalMsg');
+  if(!home || !away || !kickoff){ msgEl.textContent = 'Renseigne les deux équipes et la date.'; return; }
+  MATCHES = MATCHES.map(m => m.id === id ? {...m, home, away, kickoff} : m);
+  try{ await fsSet('matches', JSON.stringify(MATCHES)); }
+  catch(e){ msgEl.textContent = "Erreur d'enregistrement."; return; }
+  msgEl.textContent = 'Match mis à jour.';
+  setTimeout(()=>{ msgEl.textContent=''; }, 2000);
+  renderBackoffice();
+  renderMatches();
+  renderLeaderboard();
+}
+
+async function boDeleteMatch(id){
+  const msgEl = document.getElementById('boGlobalMsg');
+  if(pendingDeleteId !== id){
+    pendingDeleteId = id;
+    msgEl.textContent = 'Clique une seconde fois sur Supprimer pour confirmer.';
+    renderBackoffice();
+    return;
+  }
+  pendingDeleteId = null;
+  MATCHES = MATCHES.filter(m => m.id !== id);
+  try{ await fsSet('matches', JSON.stringify(MATCHES)); }
+  catch(e){ msgEl.textContent = "Erreur d'enregistrement."; return; }
+  msgEl.textContent = 'Match supprimé.';
+  setTimeout(()=>{ msgEl.textContent=''; }, 2000);
+  renderBackoffice();
+  renderMatches();
+  renderLeaderboard();
+}
+
+async function boResetPassword(){
+  const name = document.getElementById('boResetPlayer').value;
+  const newPass = document.getElementById('boResetPass').value;
+  const msg = document.getElementById('boResetMsg');
+  if(!name){ msg.textContent = "Aucun joueur à réinitialiser pour l'instant."; return; }
+  if(!newPass || newPass.length < 4){ msg.textContent = 'Choisis un mot de passe de 4 caractères minimum.'; return; }
+  try{
+    const hash = await sha256Hex(newPass);
+    const key = 'user:' + name.toLowerCase();
+    const ok = await fsSet(key, JSON.stringify({name, hash}));
+    if(!ok){ msg.textContent = "Échec de l'enregistrement."; return; }
+    msg.textContent = `Mot de passe de ${name} réinitialisé. Communique-le lui directement.`;
+    document.getElementById('boResetPass').value = '';
+  }catch(e){
+    msg.textContent = "Erreur : " + (e && e.message ? e.message : 'inconnue');
+  }
+}
+
+async function boAddMatch(){
+  const home = document.getElementById('boNewHome').value.trim();
+  const away = document.getElementById('boNewAway').value.trim();
+  const kickoff = document.getElementById('boNewKickoff').value;
+  const msgEl = document.getElementById('boGlobalMsg');
+  if(!home || !away || !kickoff){ msgEl.textContent = 'Renseigne les deux équipes et la date.'; return; }
+  const id = 'm' + Date.now();
+  MATCHES.push({id, home, away, kickoff});
+  try{ await fsSet('matches', JSON.stringify(MATCHES)); }
+  catch(e){ msgEl.textContent = "Erreur d'enregistrement."; return; }
+  document.getElementById('boNewHome').value = '';
+  document.getElementById('boNewAway').value = '';
+  document.getElementById('boNewKickoff').value = '';
+  msgEl.textContent = 'Match ajouté.';
+  setTimeout(()=>{ msgEl.textContent=''; }, 2000);
+  renderBackoffice();
+  renderMatches();
+  renderLeaderboard();
+}
+
+init();
+</script>
+</body>
+</html>
