@@ -139,7 +139,8 @@
 </head>
 <body>
 
-<div id="auth">
+<div id="loadingScreen" style="text-align:center;padding:80px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#6B7080;">Chargement…</div>
+<div id="auth" style="display:none;">
   <div class="auth-card">
     <h2 id="authTitle">Connexion</h2>
     <p class="sub" id="authSub">Entre ton prénom et ton mot de passe.</p>
@@ -162,13 +163,10 @@
     <div class="inner">
       <div>
         <div class="brand">
-          <svg class="ball" width="28" height="28" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="14.5" fill="#fff"/>
-            <circle cx="16" cy="16" r="14.5" fill="none" stroke="#10131F" stroke-width="1.2"/>
-            <polygon points="16,9 20.5,12.3 18.8,17.5 13.2,17.5 11.5,12.3" fill="#10131F"/>
-            <path d="M16 9 L16 3.5 M20.5 12.3 L27 10.2 M18.8 17.5 L22 25 M13.2 17.5 L10 25 M11.5 12.3 L5 10.2" stroke="#10131F" stroke-width="1.1" fill="none"/>
+          <svg class="ball" width="26" height="30" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 1.5 L14.2 10 L18.5 10 L15 13.5 L20.5 17.5 L14.8 17.5 L16.5 24 L12 20.5 L7.5 24 L9.2 17.5 L3.5 17.5 L9 13.5 L5.5 10 L9.8 10 Z M8.5 24.8 H15.5 L16.3 27.2 H7.7 Z M6.8 28 H17.2 L18 30.5 H6 Z" fill="#F2A900"/>
           </svg>
-          <h1>PSG LDC Copeums</h1>
+          <h1>PSG LDC <span style="color:#FF4D5E;">Copeums</span></h1>
         </div>
         <p>Ligue des Champions 2026/27</p>
       </div>
@@ -208,7 +206,7 @@
       <div class="section-title">Barème des points</div>
       <div class="card rules-card">
         <div><span>Bon vainqueur</span><span>1 pt</span></div>
-        <div><span>Bon vainqueur + score exact</span><span>2 pts</span></div>
+        <div><span>Bon vainqueur + score exact</span><span>3 pts</span></div>
         <div><span>Bon vainqueur + bonne différence de buts</span><span>1,5 pt</span></div>
         <div><span>Mauvais pronostic</span><span>0 pt</span></div>
         <div><span>Équipe victorieuse de la Ligue des Champions</span><span>5 pts</span></div>
@@ -218,7 +216,7 @@
       <div class="section-title">Ce que ça veut dire, en exemples</div>
 
       <div class="card">
-        <div class="ex-label">Score exact <span class="ex-pts">2 pts</span></div>
+        <div class="ex-label">Score exact <span class="ex-pts">3 pts</span></div>
         <div class="ex-sub">Tu as trouvé le score du match, au but près.</div>
         <div class="ex-row"><span>Ton prono</span><span class="ex-val">PSG 2 – 1 Roma</span></div>
         <div class="ex-row"><span>Score final</span><span class="ex-val">PSG 2 – 1 Roma</span></div>
@@ -277,6 +275,22 @@
       </div>
       <div id="boContent" style="display:none;">
         <div class="msg" id="boGlobalMsg"></div>
+
+        <div class="section-title">Résultat final de la Ligue des Champions</div>
+        <div class="card">
+          <div class="field">
+            <label>Équipe victorieuse (réel)</label>
+            <input type="text" id="boFinalChampion" placeholder="ex : PSG">
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label>Meilleur buteur (réel)</label>
+            <input type="text" id="boFinalScorer" placeholder="ex : Ousmane Dembélé">
+          </div>
+          <button style="margin-top:12px;" onclick="boSaveFinalResults()">Enregistrer le résultat final</button>
+          <div class="msg" id="boFinalMsg"></div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px;">Une fois renseigné, les 5 pts de chaque bonus sont attribués automatiquement à qui a deviné juste (comparaison insensible à la casse).</div>
+        </div>
+
         <div id="boMatches"></div>
 
         <div class="section-title">Réinitialiser un mot de passe</div>
@@ -370,6 +384,7 @@ let MATCHES = [];
 let scores = {};
 let predictions = {};
 let bonuses = {};
+let finalResults = {champion:'', scorer:''};
 let players = [];
 let adminUnlocked = false;
 let pendingDeleteId = null;
@@ -410,9 +425,12 @@ async function init(){
   await loadShared();
   let session = null;
   try{ session = localStorage.getItem('prono_session'); }catch(e){ session = null; }
+  document.getElementById('loadingScreen').style.display = 'none';
   if(session && players.includes(session)){
     currentName = session;
     enterApp();
+  } else {
+    document.getElementById('auth').style.display = 'block';
   }
 }
 
@@ -430,6 +448,8 @@ async function loadShared(){
   catch(e){ scores = {}; }
   try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
   catch(e){ players = []; }
+  try{ const fr = await fsGet('finalResults'); finalResults = fr ? JSON.parse(fr) : {champion:'', scorer:''}; }
+  catch(e){ finalResults = {champion:'', scorer:''}; }
 
   predictions = {}; bonuses = {};
   for(const name of players){
@@ -622,10 +642,12 @@ function pointsForMatch(pred, final){
   const predDiff = pred.h - pred.a;
   const finalDiff = final.h - final.a;
   if(Math.sign(predDiff) !== Math.sign(finalDiff)) return 0;
-  if(pred.h === final.h && pred.a === final.a) return 2;
+  if(pred.h === final.h && pred.a === final.a) return 3;
   if(predDiff === finalDiff) return 1.5;
   return 1;
 }
+
+function normalizeGuess(s){ return (s||'').trim().toLowerCase(); }
 
 function renderLeaderboard(){
   const el = document.getElementById('leaderboard');
@@ -641,7 +663,14 @@ function renderLeaderboard(){
       pts += pointsForMatch(predictions[name+'|'+m.id], final);
     }
     const b = bonuses[name] || {};
-    return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—'};
+    let bonusHit = [];
+    if(finalResults.champion && b.champion && normalizeGuess(b.champion) === normalizeGuess(finalResults.champion)){
+      pts += 5; bonusHit.push('vainqueur');
+    }
+    if(finalResults.scorer && b.scorer && normalizeGuess(b.scorer) === normalizeGuess(finalResults.scorer)){
+      pts += 5; bonusHit.push('buteur');
+    }
+    return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—', bonusHit};
   });
   rows.sort((a,b)=> b.pts - a.pts);
   let html = `<table class="leader"><thead><tr>
@@ -650,8 +679,8 @@ function renderLeaderboard(){
   rows.forEach((r,i)=>{
     html += `<tr class="${i===0 ? 'top1' : ''}">
       <td class="rank">${i+1}</td>
-      <td class="name">${r.name}</td>
-      <td class="picks">Vainqueur : ${r.champion}<br>Buteur : ${r.scorer}</td>
+      <td class="name">${r.name}${i===0 ? ' 🏆' : ''}</td>
+      <td class="picks">Vainqueur : ${r.champion}${r.bonusHit.includes('vainqueur') ? ' ✅' : ''}<br>Buteur : ${r.scorer}${r.bonusHit.includes('buteur') ? ' ✅' : ''}</td>
       <td class="pts">${r.pts}</td>
     </tr>`;
   });
@@ -677,6 +706,9 @@ function renderBackoffice(){
   document.getElementById('boGate').style.display = adminUnlocked ? 'none' : 'block';
   document.getElementById('boContent').style.display = adminUnlocked ? 'block' : 'none';
   if(!adminUnlocked) return;
+
+  document.getElementById('boFinalChampion').value = finalResults.champion || '';
+  document.getElementById('boFinalScorer').value = finalResults.scorer || '';
 
   const sel = document.getElementById('boResetPlayer');
   sel.innerHTML = players.map(p => `<option value="${p}">${p}</option>`).join('');
@@ -748,6 +780,18 @@ async function boDeleteMatch(id){
   setTimeout(()=>{ msgEl.textContent=''; }, 2000);
   renderBackoffice();
   renderMatches();
+  renderLeaderboard();
+}
+
+async function boSaveFinalResults(){
+  const champion = document.getElementById('boFinalChampion').value.trim();
+  const scorer = document.getElementById('boFinalScorer').value.trim();
+  const msgEl = document.getElementById('boFinalMsg');
+  finalResults = {champion, scorer};
+  try{ await fsSet('finalResults', JSON.stringify(finalResults)); }
+  catch(e){ msgEl.textContent = "Erreur d'enregistrement."; return; }
+  msgEl.textContent = 'Résultat final enregistré.';
+  setTimeout(()=>{ msgEl.textContent=''; }, 2000);
   renderLeaderboard();
 }
 
