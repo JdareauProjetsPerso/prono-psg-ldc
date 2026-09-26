@@ -118,6 +118,23 @@ async function main() {
   } else {
     console.log('No new scores to update.');
   }
+
+  // --- 3) Statut "en direct" (pour afficher un badge côté app) ---
+  const LIVE_STATUSES = ['IN_PLAY', 'PAUSED'];
+  const liveStatus = {};
+  for (const mt of matches) {
+    const date = mt.kickoff.slice(0, 10);
+    const apiMatch = psgMatches.find(m => toParisKickoff(m.utcDate).slice(0, 10) === date);
+    if (apiMatch && LIVE_STATUSES.includes(apiMatch.status)) {
+      liveStatus[mt.id] = apiMatch.status;
+    }
+  }
+  await db.collection(COLLECTION).doc('liveStatus').set({ value: JSON.stringify(liveStatus), updatedAt: Date.now() });
+  if (Object.keys(liveStatus).length > 0) {
+    console.log('Match(s) en direct :', JSON.stringify(liveStatus));
+  } else {
+    console.log('Aucun match en direct actuellement.');
+  }
 }
 
 main().catch(err => {
