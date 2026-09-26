@@ -2,14 +2,12 @@ name: Update PSG scores
 
 on:
   schedule:
-    # Ces horaires (en UTC) couvrent la fenêtre "21h-8h heure de Paris",
-    # été ET hiver confondus. L'étape "Check match window" ci-dessous
-    # vérifie ensuite l'heure réelle de Paris et n'exécute le reste que
-    # si on est bien dans la fenêtre voulue : pas besoin de retoucher ce
-    # fichier au changement d'heure.
-    - cron: '0 19-23 * * 2'
+    # Pendant le match (mardi/mercredi, ~20h45-minuit heure de Paris, été et
+    # hiver confondus) : toutes les 5 minutes (GitHub n'autorise pas plus
+    # fréquent que ça).
+    - cron: '*/5 18-22 * * 2,3'
+    # Après le match, jusqu'au lendemain matin : toutes les heures.
     - cron: '0 0-7 * * 3'
-    - cron: '0 19-23 * * 3'
     - cron: '0 0-7 * * 4'
     # Une fois par jour, pour repérer un nouveau match ajouté au calendrier
     # ou rattraper un score manqué. Celle-ci s'exécute toujours.
@@ -30,10 +28,12 @@ jobs:
             exit 0
           fi
           hour=$(TZ=Europe/Paris date +%-H)
+          min=$(TZ=Europe/Paris date +%-M)
           day=$(TZ=Europe/Paris date +%u)   # 1=lundi ... 7=dimanche
+          totalmin=$((hour*60+min))
           run=false
-          # Mardi ou mercredi soir, à partir de 21h.
-          if { [ "$day" = "2" ] || [ "$day" = "3" ]; } && [ "$hour" -ge 21 ]; then run=true; fi
+          # Mardi ou mercredi, à partir de 20h45.
+          if { [ "$day" = "2" ] || [ "$day" = "3" ]; } && [ "$totalmin" -ge 1245 ]; then run=true; fi
           # Le lendemain matin (mercredi ou jeudi), jusqu'à 8h.
           if { [ "$day" = "3" ] || [ "$day" = "4" ]; } && [ "$hour" -lt 8 ]; then run=true; fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
@@ -49,3 +49,4 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
