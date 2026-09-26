@@ -28,19 +28,6 @@ function toParisKickoff(utcDateStr) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-function slugify(text) {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
-}
-
-function opponentOf(match) {
-  return match.home === 'PSG' ? match.away : match.home;
-}
-
 async function main() {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!apiKey) throw new Error('FOOTBALL_DATA_API_KEY secret is missing.');
@@ -70,31 +57,43 @@ async function main() {
 
   const psgMatches = (data.matches || []).filter(m => isPSG(m.homeTeam) || isPSG(m.awayTeam));
 
-  // --- 1) Repérer et ajouter les nouveaux matchs de Ligue des Champions ---
-  let added = 0;
+  // --- 1) Reconstruire la liste des matchs à partir de l'API (source unique
+  //         de vérité). Le PSG ne joue jamais deux matchs de C1 le même
+  //         jour : on garde donc un seul match par date, quitte à fusionner
+  //         d'éventuels doublons créés par le passé. On réutilise
+  //         l'identifiant déjà existant pour cette date (en préférant un id
+  //         "propre" du type "m3" à un id généré "cl-xxxxx") afin de ne pas
+  //         perdre les pronostics déjà enregistrés dessus.
+  const byDate = new Map();
+  for (const existing of matches) {
+    const d = existing.kickoff.slice(0, 10);
+    const current = byDate.get(d);
+    if (!current || (/^cl-/.test(current.id) && !/^cl-/.test(existing.id))) {
+      byDate.set(d, existing);
+    }
+  }
+
+  const newMatches = [];
   for (const m of psgMatches) {
     const kickoff = toParisKickoff(m.utcDate);
     const date = kickoff.slice(0, 10);
     const home = isPSG(m.homeTeam) ? 'PSG' : opponentName(m.homeTeam);
     const away = isPSG(m.awayTeam) ? 'PSG' : opponentName(m.awayTeam);
-    const opponent = home === 'PSG' ? away : home;
-
-    const alreadyKnown = matches.some(x => x.kickoff.slice(0, 10) === date
-      && slugify(opponentOf(x)) === slugify(opponent));
-    if (alreadyKnown) continue;
-
-    const newMatch = { id: 'cl-' + m.id, apiId: m.id, home, away, kickoff };
-    matches.push(newMatch);
-    added++;
-    console.log(`Nouveau match ajouté : ${home} vs ${away} (${kickoff})`);
+    const existing = byDate.get(date);
+    const id = existing ? existing.id : ('cl-' + m.id);
+    newMatches.push({ id, apiId: m.id, home, away, kickoff });
   }
+  newMatches.sort((a, b) => a.kickoff.localeCompare(b.kickoff));
 
-  if (added > 0) {
-    matches.sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  const sortedOld = matches.slice().sort((a, b) => a.kickoff.localeCompare(b.kickoff));
+  const changed = JSON.stringify(newMatches) !== JSON.stringify(sortedOld);
+  matches = newMatches;
+
+  if (changed) {
     await db.collection(COLLECTION).doc('matches').set({ value: JSON.stringify(matches), updatedAt: Date.now() });
-    console.log(`${added} nouveau(x) match(s) écrit(s) dans Firestore.`);
+    console.log(`Liste des matchs synchronisée avec l'API (${matches.length} match(s)).`);
   } else {
-    console.log('Aucun nouveau match à ajouter.');
+    console.log('Liste des matchs déjà à jour.');
   }
 
   // --- 2) Mettre à jour les scores, y compris en cours de match ---
@@ -138,19 +137,4 @@ async function main() {
 
   // --- 4) Liste des clubs de la compétition (pour le menu déroulant
   //         "équipe qui remporte la Ligue des Champions" côté app) ---
-  const teamNames = new Set();
-  for (const m of (data.matches || [])) {
-    for (const team of [m.homeTeam, m.awayTeam]) {
-      if (!team) continue;
-      teamNames.add(isPSG(team) ? 'PSG' : opponentName(team));
-    }
-  }
-  const clTeams = Array.from(teamNames).sort((a, b) => a.localeCompare(b, 'fr'));
-  await db.collection(COLLECTION).doc('clTeams').set({ value: JSON.stringify(clTeams), updatedAt: Date.now() });
-  console.log(`${clTeams.length} club(s) de la compétition enregistré(s).`);
-}
-
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+  con
