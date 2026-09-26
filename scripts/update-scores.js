@@ -135,6 +135,19 @@ async function main() {
   } else {
     console.log('Aucun match en direct actuellement.');
   }
+
+  // --- 4) Liste des clubs de la compétition (pour le menu déroulant
+  //         "équipe qui remporte la Ligue des Champions" côté app) ---
+  const teamNames = new Set();
+  for (const m of (data.matches || [])) {
+    for (const team of [m.homeTeam, m.awayTeam]) {
+      if (!team) continue;
+      teamNames.add(isPSG(team) ? 'PSG' : opponentName(team));
+    }
+  }
+  const clTeams = Array.from(teamNames).sort((a, b) => a.localeCompare(b, 'fr'));
+  await db.collection(COLLECTION).doc('clTeams').set({ value: JSON.stringify(clTeams), updatedAt: Date.now() });
+  console.log(`${clTeams.length} club(s) de la compétition enregistré(s).`);
 }
 
 main().catch(err => {
