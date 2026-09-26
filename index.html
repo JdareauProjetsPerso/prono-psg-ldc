@@ -199,7 +199,7 @@
         </div>
         <div class="bonus-field" style="margin-bottom:0;">
           <label>Meilleur buteur de la Ligue des Champions</label>
-          <input type="text" id="bonusScorer" placeholder="ex : Ousmane Dembélé">
+          <select id="bonusScorer"></select>
         </div>
       </div>
 
@@ -292,7 +292,8 @@
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>Meilleur buteur (réel)</label>
-            <input type="text" id="boFinalScorer" placeholder="ex : Ousmane Dembélé">
+            <input type="text" id="boFinalScorer" placeholder="ex : Ousmane Dembélé" list="scorerSuggestions">
+            <datalist id="scorerSuggestions"></datalist>
           </div>
           <button style="margin-top:12px;" onclick="boSaveFinalResults()">Enregistrer le résultat final</button>
           <div class="msg" id="boFinalMsg"></div>
@@ -418,6 +419,7 @@ let liveStatus = {};
 let clTeams = [];
 let teamCrests = {};
 let scorerOverrides = {};
+let topScorers = [];
 let predictions = {};
 let bonuses = {};
 let finalResults = {champion:'', scorer:''};
@@ -494,6 +496,8 @@ async function loadShared(){
   }
   try{ const so = await fsGet('scorerOverrides'); scorerOverrides = so ? JSON.parse(so) : {}; }
   catch(e){ scorerOverrides = {}; }
+  try{ const ts = await fsGet('topScorers'); topScorers = ts ? JSON.parse(ts) : []; }
+  catch(e){ topScorers = []; }
   try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
   catch(e){ players = []; }
   try{ const fr = await fsGet('finalResults'); finalResults = fr ? JSON.parse(fr) : {champion:'', scorer:''}; }
@@ -576,15 +580,30 @@ function populateTeamSelect(selectEl, selectedValue){
   selectEl.innerHTML = html;
 }
 
+function scorerOptionsList(){
+  return topScorers || [];
+}
+
+function populateScorerSelect(selectEl, selectedValue){
+  if(!selectEl) return;
+  const list = scorerOptionsList();
+  let html = '<option value="">— Choisis un joueur —</option>';
+  for(const name of list){
+    html += `<option value="${name}"${name === selectedValue ? ' selected' : ''}>${name}</option>`;
+  }
+  if(selectedValue && !list.includes(selectedValue)){
+    html += `<option value="${selectedValue}" selected>${selectedValue} (ancienne saisie)</option>`;
+  }
+  selectEl.innerHTML = html;
+}
+
 function enterApp(){
   document.getElementById('auth').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('tabbar').style.display = 'flex';
   document.getElementById('whoName').textContent = currentName;
   populateTeamSelect(document.getElementById('bonusChampion'), bonuses[currentName] ? bonuses[currentName].champion : '');
-  if(bonuses[currentName]){
-    document.getElementById('bonusScorer').value = bonuses[currentName].scorer || '';
-  }
+  populateScorerSelect(document.getElementById('bonusScorer'), bonuses[currentName] ? bonuses[currentName].scorer : '');
   const locked = isBonusLocked();
   document.getElementById('bonusChampion').disabled = locked;
   document.getElementById('bonusScorer').disabled = locked;
@@ -654,6 +673,17 @@ function teamBadgeFallback(name){
 
 function renderMatches(){
   const el = document.getElementById('matches');
+  // Avant de reconstruire les cartes (ex : rafraîchissement auto toutes les
+  // 60s pendant un match), on sauvegarde ce que l'utilisateur est peut-être
+  // en train de saisir sans avoir encore cliqué sur "Enregistrer", pour ne
+  // pas lui faire perdre sa saisie en cours.
+  const unsavedInputs = {};
+  for(const m of MATCHES){
+    const hEl0 = document.getElementById('pred-'+m.id+'-h');
+    const aEl0 = document.getElementById('pred-'+m.id+'-a');
+    if(hEl0 && !hEl0.disabled) unsavedInputs[m.id+'-h'] = hEl0.value;
+    if(aEl0 && !aEl0.disabled) unsavedInputs[m.id+'-a'] = aEl0.value;
+  }
   el.innerHTML = '';
   for(const m of MATCHES){
     const {locked, final, kickoffPassed} = isLocked(m);
@@ -665,9 +695,9 @@ function renderMatches(){
 
     html += `<div class="pred-row">
       <span class="lbl">Ton pronostic</span>
-      <input type="number" min="0" id="pred-${m.id}-h" value="${myPred ? myPred.h : ''}" ${locked ? 'disabled' : ''}>
+      <input type="number" min="0" step="1" inputmode="numeric" id="pred-${m.id}-h" value="${myPred ? myPred.h : ''}" ${locked ? 'disabled' : ''} oninput="this.value=this.value.replace(/[^0-9]/g,'')">
       <span>—</span>
-      <input type="number" min="0" id="pred-${m.id}-a" value="${myPred ? myPred.a : ''}" ${locked ? 'disabled' : ''}>
+      <input type="number" min="0" step="1" inputmode="numeric" id="pred-${m.id}-a" value="${myPred ? myPred.a : ''}" ${locked ? 'disabled' : ''} oninput="this.value=this.value.replace(/[^0-9]/g,'')">
     </div>`;
 
     const isLive = !!liveStatus[m.id];
@@ -683,6 +713,11 @@ function renderMatches(){
     }
     div.innerHTML = html;
     el.appendChild(div);
+  }
+  // On restaure la saisie en cours là où elle existait encore.
+  for(const key in unsavedInputs){
+    const inputEl = document.getElementById('pred-'+key);
+    if(inputEl && !inputEl.disabled) inputEl.value = unsavedInputs[key];
   }
 }
 
@@ -804,6 +839,14 @@ function renderLeaderboard(){
     return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—', bonusHit};
   });
   rows.sort((a,b)=> b.pts - a.pts);
+  // Classement "1,1,3,4..." : les ex-aequo partagent le même rang, et le
+  // rang suivant tient compte du nombre de joueurs déjà classés devant.
+  let rank = 0, prevPts = null;
+  rows.forEach((r,i)=>{
+    if(prevPts === null || r.pts !== prevPts){ rank = i+1; }
+    r.rank = rank;
+    prevPts = r.pts;
+  });
   const liveCount = Object.keys(liveStatus).length;
   let html = '';
   if(liveCount > 0){
@@ -812,10 +855,10 @@ function renderLeaderboard(){
   html += `<table class="leader"><thead><tr>
     <th></th><th>Joueur</th><th>Pronos bonus</th><th style="text-align:right;">Pts</th>
   </tr></thead><tbody>`;
-  rows.forEach((r,i)=>{
-    html += `<tr class="${i===0 ? 'top1' : ''}">
-      <td class="rank">${i+1}</td>
-      <td class="name">${r.name}${i===0 ? ' 🏆' : ''}</td>
+  rows.forEach((r)=>{
+    html += `<tr class="${r.rank===1 ? 'top1' : ''}">
+      <td class="rank">${r.rank}</td>
+      <td class="name">${r.name}${r.rank===1 ? ' 🏆' : ''}</td>
       <td class="picks">Vainqueur : ${r.champion}${r.bonusHit.includes('vainqueur') ? ' ✅' : ''}<br>Buteur : ${r.scorer}${r.bonusHit.includes('buteur') ? ' ✅' : ''}</td>
       <td class="pts">${r.pts}</td>
     </tr>`;
@@ -845,6 +888,8 @@ function renderBackoffice(){
 
   populateTeamSelect(document.getElementById('boFinalChampion'), finalResults.champion || '');
   document.getElementById('boFinalScorer').value = finalResults.scorer || '';
+  const scorerDatalist = document.getElementById('scorerSuggestions');
+  if(scorerDatalist) scorerDatalist.innerHTML = scorerOptionsList().map(n => `<option value="${n}">`).join('');
   renderScorerReview();
 
   const sel = document.getElementById('boResetPlayer');
@@ -873,8 +918,8 @@ function renderBackoffice(){
       <div class="field" style="margin-top:14px;border-top:1px dashed var(--line);padding-top:12px;">
         <label>Score final</label>
         <div class="bo-row">
-          <input type="number" min="0" id="final-${m.id}-h" placeholder="0" value="${final ? final.h : ''}">
-          <input type="number" min="0" id="final-${m.id}-a" placeholder="0" value="${final ? final.a : ''}">
+          <input type="number" min="0" step="1" inputmode="numeric" id="final-${m.id}-h" placeholder="0" value="${final ? final.h : ''}" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+          <input type="number" min="0" step="1" inputmode="numeric" id="final-${m.id}-a" placeholder="0" value="${final ? final.a : ''}" oninput="this.value=this.value.replace(/[^0-9]/g,'')">
         </div>
         <button style="margin-top:8px;" onclick="enterFinal('${m.id}')">${final ? 'Modifier le score' : 'Enregistrer le score'}</button>
         <div class="msg" id="finalMsg-${m.id}"></div>
