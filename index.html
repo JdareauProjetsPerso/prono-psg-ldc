@@ -276,13 +276,6 @@
       <div id="boContent" style="display:none;">
         <div class="msg" id="boGlobalMsg"></div>
 
-        <div class="section-title">Mise à jour automatique des scores</div>
-        <div class="card">
-          <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">Va chercher les scores des matchs déjà joués sur un calendrier externe et les enregistre automatiquement, si le navigateur y arrive.</div>
-          <button onclick="boFetchScores()" id="boFetchBtn">Mettre à jour les scores</button>
-          <div class="msg" id="boFetchMsg"></div>
-        </div>
-
         <div class="section-title">Résultat final de la Ligue des Champions</div>
         <div class="card">
           <div class="field">
@@ -785,87 +778,6 @@ async function boDeleteMatch(id){
   catch(e){ msgEl.textContent = "Erreur d'enregistrement."; return; }
   msgEl.textContent = 'Match supprimé.';
   setTimeout(()=>{ msgEl.textContent=''; }, 2000);
-  renderBackoffice();
-  renderMatches();
-  renderLeaderboard();
-}
-
-const ICS_FEED_URL = 'https://www.voetbalkrant.com/soccer/calendar/team/team_133_nl.ics';
-
-function parseIcsEvents(icsText){
-  const events = [];
-  const blocks = icsText.split('BEGIN:VEVENT').slice(1);
-  for(const block of blocks){
-    const dtMatch = block.match(/DTSTART[^:]*:(\d{8})/);
-    const summaryMatch = block.match(/SUMMARY:(.+)/);
-    if(!dtMatch || !summaryMatch) continue;
-    const raw = dtMatch[1];
-    const isoDate = raw.slice(0,4) + '-' + raw.slice(4,6) + '-' + raw.slice(6,8);
-    events.push({ date: isoDate, summary: summaryMatch[1].trim() });
-  }
-  return events;
-}
-
-function extractScoreFromSummary(summary){
-  const m = summary.match(/:\s*(\d+)\s*-\s*(\d+)\s*$/);
-  if(!m) return null;
-  return { h: parseInt(m[1]), a: parseInt(m[2]) };
-}
-
-async function boFetchScores(){
-  const btn = document.getElementById('boFetchBtn');
-  const msgEl = document.getElementById('boFetchMsg');
-  btn.disabled = true;
-  msgEl.style.color = 'var(--muted)';
-  msgEl.textContent = 'Récupération en cours…';
-
-  let icsText;
-  try{
-    const res = await fetch(ICS_FEED_URL, { mode: 'cors' });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    icsText = await res.text();
-  }catch(e){
-    btn.disabled = false;
-    msgEl.style.color = 'var(--red)';
-    msgEl.textContent = "Le navigateur a bloqué cette récupération (probablement une restriction de sécurité du site externe). La mise à jour automatique n'est pas possible depuis ce bouton — demande à Claude de mettre en place l'automatisation côté serveur, ou continue à entrer les scores manuellement ci-dessous.";
-    return;
-  }
-
-  const events = parseIcsEvents(icsText);
-  let updated = 0;
-  let checked = 0;
-
-  for(const m of MATCHES){
-    const kickoffDate = m.kickoff.slice(0,10);
-    const match = events.find(ev => ev.date === kickoffDate);
-    if(!match) continue;
-    checked++;
-    const score = extractScoreFromSummary(match.summary);
-    if(!score) continue;
-    if(scores[m.id] && scores[m.id].h === score.h && scores[m.id].a === score.a) continue;
-    scores[m.id] = score;
-    updated++;
-  }
-
-  if(updated > 0){
-    try{ await fsSet('scores', JSON.stringify(scores)); }
-    catch(e){
-      btn.disabled = false;
-      msgEl.style.color = 'var(--red)';
-      msgEl.textContent = "Scores trouvés mais erreur lors de l'enregistrement. Réessaie.";
-      return;
-    }
-  }
-
-  btn.disabled = false;
-  msgEl.style.color = 'var(--green-deep)';
-  if(updated > 0){
-    msgEl.textContent = `${updated} score(s) mis à jour sur ${checked} match(s) trouvé(s) dans le calendrier.`;
-  } else if(checked > 0){
-    msgEl.textContent = `Aucun nouveau score (${checked} match(s) trouvé(s) mais pas encore joué(s), ou déjà à jour).`;
-  } else {
-    msgEl.textContent = "Aucun de nos matchs n'a été retrouvé dans ce calendrier pour l'instant.";
-  }
   renderBackoffice();
   renderMatches();
   renderLeaderboard();
