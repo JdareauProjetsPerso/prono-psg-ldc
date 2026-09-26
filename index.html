@@ -295,7 +295,13 @@
           </div>
           <button style="margin-top:12px;" onclick="boSaveFinalResults()">Enregistrer le résultat final</button>
           <div class="msg" id="boFinalMsg"></div>
-          <div style="font-size:12px;color:var(--muted);margin-top:8px;">Une fois renseigné, les 5 pts de chaque bonus sont attribués automatiquement à qui a deviné juste (comparaison insensible à la casse).</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px;">Une fois renseigné, les 5 pts de chaque bonus sont attribués automatiquement à qui a deviné juste (comparaison insensible à la casse et aux accents).</div>
+        </div>
+
+        <div class="section-title">Bonus buteur — cas litigieux</div>
+        <div class="card">
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:12px;">Une fois le vrai buteur renseigné ci-dessus, retrouve ici qui a deviné juste automatiquement, et crédite manuellement les points à quelqu'un dont la réponse était la bonne mais mal orthographiée (faute de frappe, surnom, etc.).</div>
+          <div id="boScorerReview"></div>
         </div>
 
         <div id="boMatches"></div>
@@ -379,11 +385,29 @@ const DEFAULT_MATCHES = [
   {id:'m8', home:'PSG', away:'Galatasaray', kickoff:'2027-01-27T21:00'},
 ];
 const ADMIN_CODE = 'PsgLuna2026';
-const BONUS_DEADLINE = '2026-09-30T23:59';
-function isBonusLocked(){ return new Date() > new Date(BONUS_DEADLINE); }
+
+// La deadline des pronostics bonus (vainqueur + buteur) est figée sur le
+// coup d'envoi du match Manchester City - PSG, quel que soit l'ordre des
+// autres matchs. Une fois ce match passé, elle reste verrouillée pour de
+// bon (elle ne "glisse" pas vers le match suivant).
+function bonusDeadlineKickoff(){
+  const target = (MATCHES || []).find(m =>
+    (m.home === 'PSG' && /manchester city/i.test(m.away)) ||
+    (m.away === 'PSG' && /manchester city/i.test(m.home))
+  );
+  return target ? new Date(target.kickoff) : null;
+}
+function isBonusLocked(){
+  const deadline = bonusDeadlineKickoff();
+  if(!deadline) return false; // match Man City - PSG introuvable : on ne bloque pas
+  return new Date() > deadline;
+}
 function fmtBonusDeadline(){
-  const d = new Date(BONUS_DEADLINE);
-  return d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+  const deadline = bonusDeadlineKickoff();
+  if(!deadline) return 'le coup d\'envoi de Manchester City - PSG';
+  const day = deadline.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+  const time = deadline.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  return `${day} à ${time}`;
 }
 
 let currentName = null;
@@ -391,6 +415,7 @@ let MATCHES = [];
 let scores = {};
 let liveStatus = {};
 let clTeams = [];
+let scorerOverrides = {};
 let predictions = {};
 let bonuses = {};
 let finalResults = {champion:'', scorer:''};
@@ -459,6 +484,8 @@ async function loadShared(){
   catch(e){ liveStatus = {}; }
   try{ const ct = await fsGet('clTeams'); clTeams = ct ? JSON.parse(ct) : []; }
   catch(e){ clTeams = []; }
+  try{ const so = await fsGet('scorerOverrides'); scorerOverrides = so ? JSON.parse(so) : {}; }
+  catch(e){ scorerOverrides = {}; }
   try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
   catch(e){ players = []; }
   try{ const fr = await fsGet('finalResults'); finalResults = fr ? JSON.parse(fr) : {champion:'', scorer:''}; }
@@ -696,7 +723,46 @@ function pointsForMatch(pred, final){
   return 1;
 }
 
-function normalizeGuess(s){ return (s||'').trim().toLowerCase(); }
+function normalizeGuess(s){
+  return (s||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+
+function renderScorerReview(){
+  const el = document.getElementById('boScorerReview');
+  if(!el) return;
+  if(!finalResults.scorer){
+    el.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Renseigne d\'abord le vrai buteur ci-dessus.</div>';
+    return;
+  }
+  const withGuess = players.filter(name => bonuses[name] && bonuses[name].scorer);
+  if(withGuess.length === 0){
+    el.innerHTML = '<div style="font-size:12.5px;color:var(--muted);">Personne n\'a encore pronostiqué de buteur.</div>';
+    return;
+  }
+  let html = '';
+  for(const name of withGuess){
+    const guess = bonuses[name].scorer;
+    const exact = normalizeGuess(guess) === normalizeGuess(finalResults.scorer);
+    const overridden = !!scorerOverrides[name];
+    html += `<div class="admin-row" style="justify-content:space-between;">
+      <span style="flex:1;font-size:13px;"><b>${name}</b> a dit : ${guess}</span>
+      ${exact
+        ? '<span class="locked-tag">✅ Reconnu automatiquement</span>'
+        : `<label style="display:flex;align-items:center;gap:6px;font-size:12.5px;">
+            <input type="checkbox" ${overridden ? 'checked' : ''} onchange="boToggleScorerOverride('${name.replace(/'/g,"\\'")}', this.checked)">
+            Créditer quand même
+          </label>`
+      }
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+async function boToggleScorerOverride(name, checked){
+  if(checked){ scorerOverrides[name] = true; } else { delete scorerOverrides[name]; }
+  try{ await fsSet('scorerOverrides', JSON.stringify(scorerOverrides)); }catch(e){}
+  renderLeaderboard();
+}
 
 function renderLeaderboard(){
   const el = document.getElementById('leaderboard');
@@ -716,7 +782,8 @@ function renderLeaderboard(){
     if(finalResults.champion && b.champion && normalizeGuess(b.champion) === normalizeGuess(finalResults.champion)){
       pts += 5; bonusHit.push('vainqueur');
     }
-    if(finalResults.scorer && b.scorer && normalizeGuess(b.scorer) === normalizeGuess(finalResults.scorer)){
+    const scorerExactMatch = finalResults.scorer && b.scorer && normalizeGuess(b.scorer) === normalizeGuess(finalResults.scorer);
+    if(scorerExactMatch || (b.scorer && scorerOverrides[name])){
       pts += 5; bonusHit.push('buteur');
     }
     return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—', bonusHit};
@@ -763,6 +830,7 @@ function renderBackoffice(){
 
   populateTeamSelect(document.getElementById('boFinalChampion'), finalResults.champion || '');
   document.getElementById('boFinalScorer').value = finalResults.scorer || '';
+  renderScorerReview();
 
   const sel = document.getElementById('boResetPlayer');
   sel.innerHTML = players.map(p => `<option value="${p}">${p}</option>`).join('');
