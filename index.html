@@ -194,7 +194,7 @@
         <div id="bonusDeadlineNotice" style="font-size:12.5px;font-weight:700;color:var(--red);margin-bottom:14px;"></div>
         <div class="bonus-field">
           <label>Équipe qui remporte la Ligue des Champions</label>
-          <input type="text" id="bonusChampion" placeholder="ex : PSG">
+          <select id="bonusChampion"></select>
         </div>
         <div class="bonus-field" style="margin-bottom:0;">
           <label>Meilleur buteur de la Ligue des Champions</label>
@@ -287,7 +287,7 @@
         <div class="card">
           <div class="field">
             <label>Équipe victorieuse (réel)</label>
-            <input type="text" id="boFinalChampion" placeholder="ex : PSG">
+            <select id="boFinalChampion"></select>
           </div>
           <div class="field" style="margin-bottom:0;">
             <label>Meilleur buteur (réel)</label>
@@ -390,6 +390,7 @@ let currentName = null;
 let MATCHES = [];
 let scores = {};
 let liveStatus = {};
+let clTeams = [];
 let predictions = {};
 let bonuses = {};
 let finalResults = {champion:'', scorer:''};
@@ -456,6 +457,8 @@ async function loadShared(){
   catch(e){ scores = {}; }
   try{ const ls = await fsGet('liveStatus'); liveStatus = ls ? JSON.parse(ls) : {}; }
   catch(e){ liveStatus = {}; }
+  try{ const ct = await fsGet('clTeams'); clTeams = ct ? JSON.parse(ct) : []; }
+  catch(e){ clTeams = []; }
   try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
   catch(e){ players = []; }
   try{ const fr = await fsGet('finalResults'); finalResults = fr ? JSON.parse(fr) : {champion:'', scorer:''}; }
@@ -518,13 +521,33 @@ function logout(){
   document.getElementById('authPass').value = '';
 }
 
+function teamOptionsList(){
+  if(clTeams && clTeams.length > 0) return clTeams;
+  // Repli si la liste complète (36 clubs) n'a pas encore été récupérée par
+  // l'automatisation : on propose au moins les adversaires déjà connus.
+  return Array.from(new Set(MATCHES.flatMap(m => [m.home, m.away]))).sort((a,b)=>a.localeCompare(b,'fr'));
+}
+
+function populateTeamSelect(selectEl, selectedValue){
+  if(!selectEl) return;
+  const list = teamOptionsList();
+  let html = '<option value="">— Choisis un club —</option>';
+  for(const name of list){
+    html += `<option value="${name}"${name === selectedValue ? ' selected' : ''}>${name}</option>`;
+  }
+  if(selectedValue && !list.includes(selectedValue)){
+    html += `<option value="${selectedValue}" selected>${selectedValue} (ancienne saisie)</option>`;
+  }
+  selectEl.innerHTML = html;
+}
+
 function enterApp(){
   document.getElementById('auth').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   document.getElementById('tabbar').style.display = 'flex';
   document.getElementById('whoName').textContent = currentName;
+  populateTeamSelect(document.getElementById('bonusChampion'), bonuses[currentName] ? bonuses[currentName].champion : '');
   if(bonuses[currentName]){
-    document.getElementById('bonusChampion').value = bonuses[currentName].champion || '';
     document.getElementById('bonusScorer').value = bonuses[currentName].scorer || '';
   }
   const locked = isBonusLocked();
@@ -738,7 +761,7 @@ function renderBackoffice(){
   document.getElementById('boContent').style.display = adminUnlocked ? 'block' : 'none';
   if(!adminUnlocked) return;
 
-  document.getElementById('boFinalChampion').value = finalResults.champion || '';
+  populateTeamSelect(document.getElementById('boFinalChampion'), finalResults.champion || '');
   document.getElementById('boFinalScorer').value = finalResults.scorer || '';
 
   const sel = document.getElementById('boResetPlayer');
