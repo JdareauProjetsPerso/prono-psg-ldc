@@ -152,6 +152,29 @@ async function main() {
   await db.collection(COLLECTION).doc('clTeams').set({ value: JSON.stringify(clTeams), updatedAt: Date.now() });
   await db.collection(COLLECTION).doc('teamCrests').set({ value: JSON.stringify(teamCrests), updatedAt: Date.now() });
   console.log(`${clTeams.length} club(s) et ${Object.keys(teamCrests).length} logo(s) enregistré(s).`);
+
+  // --- 5) Liste des meilleurs buteurs actuels de la compétition (pour
+  //         proposer un menu déroulant plutôt qu'un champ texte libre sur
+  //         le pronostic "meilleur buteur") ---
+  try {
+    const scorersRes = await fetch(`${API_BASE}/competitions/${COMPETITION_CODE}/scorers?limit=50`, {
+      headers: { 'X-Auth-Token': apiKey },
+    });
+    if (scorersRes.ok) {
+      const scorersData = await scorersRes.json();
+      const topScorers = (scorersData.scorers || [])
+        .slice()
+        .sort((a, b) => (b.goals || 0) - (a.goals || 0))
+        .map(s => s.player && s.player.name)
+        .filter(Boolean);
+      await db.collection(COLLECTION).doc('topScorers').set({ value: JSON.stringify(topScorers), updatedAt: Date.now() });
+      console.log(`${topScorers.length} meilleur(s) buteur(s) enregistré(s).`);
+    } else {
+      console.log('Impossible de récupérer les meilleurs buteurs (HTTP ' + scorersRes.status + '), on réessaiera au prochain passage.');
+    }
+  } catch (e) {
+    console.log('Erreur lors de la récupération des meilleurs buteurs :', e.message);
+  }
 }
 
 main().catch(err => {
