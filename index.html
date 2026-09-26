@@ -100,6 +100,13 @@
     font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:20px;
   }
   .final-note{margin-top:8px;font-size:13px;font-weight:700;color:var(--green-deep);}
+  .live-tag{
+    display:inline-flex;align-items:center;gap:6px;margin-top:8px;background:var(--red);color:#fff;
+    font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:20px;
+  }
+  .live-tag .dot{width:7px;height:7px;border-radius:50%;background:#fff;animation:live-pulse 1.4s ease-in-out infinite;}
+  @keyframes live-pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+  @media (prefers-reduced-motion: reduce){ .live-tag .dot{animation:none;} }
   .admin-row{margin-top:10px;display:flex;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:10px;}
   .admin-row input{width:52px;text-align:center;padding:8px 4px;}
   .admin-row button{width:auto;padding:8px 12px;font-size:12.5px;background:var(--ink);}
@@ -382,6 +389,7 @@ function fmtBonusDeadline(){
 let currentName = null;
 let MATCHES = [];
 let scores = {};
+let liveStatus = {};
 let predictions = {};
 let bonuses = {};
 let finalResults = {champion:'', scorer:''};
@@ -446,6 +454,8 @@ async function loadShared(){
 
   try{ const s = await fsGet('scores'); scores = s ? JSON.parse(s) : {}; }
   catch(e){ scores = {}; }
+  try{ const ls = await fsGet('liveStatus'); liveStatus = ls ? JSON.parse(ls) : {}; }
+  catch(e){ liveStatus = {}; }
   try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
   catch(e){ players = []; }
   try{ const fr = await fsGet('finalResults'); finalResults = fr ? JSON.parse(fr) : {champion:'', scorer:''}; }
@@ -525,6 +535,18 @@ function enterApp(){
     : `À remplir avant le ${fmtBonusDeadline()}.`;
   renderMatches();
   renderLeaderboard();
+  startLiveRefresh();
+}
+
+let liveRefreshTimer = null;
+function startLiveRefresh(){
+  if(liveRefreshTimer) return;
+  liveRefreshTimer = setInterval(async()=>{
+    try{ const s = await fsGet('scores'); scores = s ? JSON.parse(s) : {}; }catch(e){}
+    try{ const ls = await fsGet('liveStatus'); liveStatus = ls ? JSON.parse(ls) : {}; }catch(e){}
+    renderMatches();
+    renderLeaderboard();
+  }, 60000);
 }
 
 function showView(v){
@@ -583,7 +605,11 @@ function renderMatches(){
       <input type="number" min="0" id="pred-${m.id}-a" value="${myPred ? myPred.a : ''}" ${locked ? 'disabled' : ''}>
     </div>`;
 
-    if(final){
+    const isLive = !!liveStatus[m.id];
+    if(isLive){
+      const scoreNow = scores[m.id];
+      html += `<span class="live-tag"><span class="dot"></span>EN DIRECT${scoreNow ? ` — ${scoreNow.h} - ${scoreNow.a}` : ''}</span>`;
+    } else if(final){
       html += `<div class="final-note">Score final : ${m.home} ${final.h} — ${final.a} ${m.away}</div>`;
       html += `<span class="locked-tag">Verrouillé</span>`;
     } else if(kickoffPassed){
@@ -673,7 +699,12 @@ function renderLeaderboard(){
     return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—', bonusHit};
   });
   rows.sort((a,b)=> b.pts - a.pts);
-  let html = `<table class="leader"><thead><tr>
+  const liveCount = Object.keys(liveStatus).length;
+  let html = '';
+  if(liveCount > 0){
+    html += `<div class="live-tag" style="margin-bottom:12px;"><span class="dot"></span>${liveCount > 1 ? 'Matchs en direct' : 'Match en direct'} — classement provisoire</div>`;
+  }
+  html += `<table class="leader"><thead><tr>
     <th></th><th>Joueur</th><th>Pronos bonus</th><th style="text-align:right;">Pts</th>
   </tr></thead><tbody>`;
   rows.forEach((r,i)=>{
