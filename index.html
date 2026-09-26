@@ -91,6 +91,7 @@
     display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
     width:26px;height:26px;border-radius:50%;font-size:9.5px;font-weight:800;letter-spacing:0.02em;
   }
+  img.team-crest{object-fit:contain;background:none;}
   .pred-row{margin-top:12px;display:flex;align-items:center;gap:8px;}
   .pred-row .lbl{flex:1;font-size:12.5px;color:var(--muted);font-weight:600;}
   .pred-row input{width:52px;text-align:center;padding:9px 4px;font-weight:700;}
@@ -415,6 +416,7 @@ let MATCHES = [];
 let scores = {};
 let liveStatus = {};
 let clTeams = [];
+let teamCrests = {};
 let scorerOverrides = {};
 let predictions = {};
 let bonuses = {};
@@ -484,6 +486,8 @@ async function loadShared(){
   catch(e){ liveStatus = {}; }
   try{ const ct = await fsGet('clTeams'); clTeams = ct ? JSON.parse(ct) : []; }
   catch(e){ clTeams = []; }
+  try{ const tc = await fsGet('teamCrests'); teamCrests = tc ? JSON.parse(tc) : {}; }
+  catch(e){ teamCrests = {}; }
   try{ const so = await fsGet('scorerOverrides'); scorerOverrides = so ? JSON.parse(so) : {}; }
   catch(e){ scorerOverrides = {}; }
   try{ const p = await fsGet('players'); players = p ? JSON.parse(p) : []; }
@@ -630,6 +634,13 @@ const TEAM_STYLE = {
   'Galatasaray': {abbr:'GAL', bg:'#A90432', fg:'#FFCC00'},
 };
 function teamBadge(name){
+  const crest = teamCrests[name];
+  if(crest){
+    return `<img class="team-badge team-crest" src="${crest}" alt="${name}" loading="lazy" onerror="this.replaceWith(document.createRange().createContextualFragment(teamBadgeFallback('${name.replace(/'/g,"\\'")}')));">`;
+  }
+  return teamBadgeFallback(name);
+}
+function teamBadgeFallback(name){
   const t = TEAM_STYLE[name];
   const bg = t ? t.bg : '#6B7080';
   const fg = t ? t.fg : '#fff';
