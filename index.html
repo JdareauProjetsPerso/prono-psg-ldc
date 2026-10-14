@@ -454,12 +454,16 @@ const ADMIN_CODE = 'PsgLuna2026';
 // coup d'envoi du match Manchester City - PSG, quel que soit l'ordre des
 // autres matchs. Une fois ce match passé, elle reste verrouillée pour de
 // bon (elle ne "glisse" pas vers le match suivant).
+// Exception : le match PSG - Manchester City reste ouvert aux pronostics
+// jusqu'à 21h10 (10 minutes après le coup d'envoi), bonus compris.
+const EXTRA_LOCK_MINUTES = 10;
+function isManCityMatch(m){
+  return (m.home === 'PSG' && /man(chester)?\.?\s*city/i.test(m.away)) ||
+         (m.away === 'PSG' && /man(chester)?\.?\s*city/i.test(m.home));
+}
 function bonusDeadlineKickoff(){
-  const target = (MATCHES || []).find(m =>
-    (m.home === 'PSG' && /man(chester)?\.?\s*city/i.test(m.away)) ||
-    (m.away === 'PSG' && /man(chester)?\.?\s*city/i.test(m.home))
-  );
-  return target ? new Date(target.kickoff) : null;
+  const target = (MATCHES || []).find(isManCityMatch);
+  return target ? new Date(new Date(target.kickoff).getTime() + EXTRA_LOCK_MINUTES * 60000) : null;
 }
 function isBonusLocked(){
   const deadline = bonusDeadlineKickoff();
@@ -788,8 +792,13 @@ function showView(v){
 
 function isLocked(m){
   const final = scores[m.id];
-  const kickoffPassed = new Date(m.kickoff) <= new Date();
-  return { locked: !!final || kickoffPassed, final, kickoffPassed };
+  const extra = isManCityMatch(m) ? EXTRA_LOCK_MINUTES : 0;
+  const lockAt = new Date(new Date(m.kickoff).getTime() + extra * 60000);
+  const kickoffPassed = new Date() >= lockAt;
+  // Un score enregistré verrouille le match, sauf pendant la prolongation
+  // exceptionnelle (le score en direct existe déjà à ce moment-là).
+  const scoreLocks = !!final && (extra === 0 || kickoffPassed);
+  return { locked: scoreLocks || kickoffPassed, final, kickoffPassed };
 }
 
 const TEAM_STYLE = {
@@ -847,11 +856,15 @@ function renderMatches(){
       <input type="number" min="0" step="1" inputmode="numeric" id="pred-${m.id}-a" value="${myPred ? myPred.a : ''}" ${locked ? 'disabled' : ''} oninput="this.value=this.value.replace(/[^0-9]/g,'')">
     </div>`;
 
+    if(isManCityMatch(m) && !locked && new Date(m.kickoff) <= new Date()){
+      const until = new Date(new Date(m.kickoff).getTime() + EXTRA_LOCK_MINUTES * 60000).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+      html += `<div style="margin-top:8px;font-size:12px;font-weight:700;color:var(--red);">Exceptionnellement ouvert jusqu'à ${until}.</div>`;
+    }
     const isLive = !!liveStatus[m.id];
     if(isLive){
       const scoreNow = scores[m.id];
       html += `<span class="live-tag"><span class="dot"></span>EN DIRECT${scoreNow ? ` — ${scoreNow.h} - ${scoreNow.a}` : ''}</span>`;
-    } else if(final){
+    } else if(final && locked){
       html += `<div class="final-note">Score final : ${m.home} ${final.h} — ${final.a} ${m.away}</div>`;
       html += `<span class="locked-tag">Verrouillé</span>`;
     } else if(kickoffPassed){
