@@ -18,13 +18,13 @@
     --red: #DA1128;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html,body{min-height:100%;}
   body{
     margin:0;
     background: var(--bg);
     color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    padding-bottom:160px;
+    padding-bottom:calc(120px + env(safe-area-inset-bottom));
   }
   .wrap{max-width:560px;margin:0 auto;padding:0 16px;}
 
@@ -125,6 +125,7 @@
   tr.top1 td.rank{color:var(--gold);}
   table.leader td.name{font-weight:700;}
   table.leader td.picks{font-size:12px;color:var(--muted);line-height:1.5;}
+  table.leader td.livepick{font-size:14px;white-space:nowrap;}
   table.leader td.pts{font-weight:800;text-align:right;color:var(--green-deep);white-space:nowrap;}
   .empty{font-size:13.5px;color:var(--muted);padding:16px 4px;text-align:center;}
   .rules-card{font-size:12.5px;color:var(--muted);}
@@ -1008,17 +1009,27 @@ function renderLeaderboard(){
     prevPts = r.pts;
   });
   const liveCount = Object.keys(liveStatus).length;
+  // Match(s) "en cours" : coup d'envoi passé depuis moins de 3 h (ou signalé
+  // en direct par le robot) et pronostics verrouillés. On affiche alors les
+  // pronostics de chacun dans le classement.
+  const curMatches = (MATCHES||[]).filter(m=>{
+    const ko = new Date(m.kickoff).getTime();
+    const started = Date.now() >= ko;
+    const recent = Date.now() < ko + 3*3600*1000;
+    return isLocked(m).locked && ((liveStatus[m.id] && started) || (started && recent));
+  });
   let html = '';
   if(liveCount > 0){
     html += `<div class="live-tag" style="margin-bottom:12px;"><span class="dot"></span>${liveCount > 1 ? 'Matchs en direct' : 'Match en direct'} — classement provisoire</div>`;
   }
   html += `<table class="leader"><thead><tr>
-    <th></th><th>Joueur</th><th>Pronos bonus</th><th style="text-align:right;">Pts</th>
+    <th></th><th>Joueur</th>${curMatches.length ? '<th>Prono du match</th>' : ''}<th>Pronos bonus</th><th style="text-align:right;">Pts</th>
   </tr></thead><tbody>`;
   rows.forEach((r)=>{
     html += `<tr class="${r.rank===1 ? 'top1' : ''}">
       <td class="rank">${r.rank}</td>
       <td class="name"><span class="lb-name">${avatarHtml(r.name, 28)}<span>${r.name}${r.rank===1 ? ' 🏆' : ''}</span></span></td>
+      ${curMatches.length ? `<td class="livepick">${curMatches.map(m=>{ const pr = predictions[r.name+'|'+m.id]; return pr ? `<b>${pr.h} - ${pr.a}</b>` : '<span style="color:var(--muted);">—</span>'; }).join('<br>')}</td>` : ''}
       <td class="picks">Vainqueur : ${r.champion}${r.bonusHit.includes('vainqueur') ? ' ✅' : ''}<br>Buteur : ${r.scorer}${r.bonusHit.includes('buteur') ? ' ✅' : ''}</td>
       <td class="pts">${r.pts}</td>
     </tr>`;
