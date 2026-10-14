@@ -360,6 +360,24 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script>
+// ---- Affichage d'une erreur lisible si le chargement échoue ----
+function showBootError(msg){
+  const el = document.getElementById('loadingScreen');
+  if(!el || el.style.display === 'none') return;
+  const safe = String(msg || 'erreur inconnue').replace(/[<>&"]/g, '?');
+  el.innerHTML = 'Chargement impossible.<br><br><small style="word-break:break-word;">' + safe + '</small><br><br><button class="small" onclick="location.reload()">Réessayer</button>';
+}
+window.addEventListener('error', function(e){
+  if(e.target && e.target !== window && (e.target.src || e.target.href)){
+    showBootError('Fichier non chargé : ' + (e.target.src || e.target.href));
+  } else {
+    showBootError(e.message);
+  }
+}, true);
+window.addEventListener('unhandledrejection', function(e){
+  showBootError(e.reason && e.reason.message ? e.reason.message : e.reason);
+});
+
 // ---- Firebase setup ----
 const firebaseConfig = {
   apiKey: "AIzaSyAuZy1Rh3KOg5Nk5tCw5xWVVQ8WNInm84A",
@@ -533,7 +551,15 @@ async function handleAvatarFile(input){
 }
 
 async function init(){
-  await loadShared();
+  try{
+    await Promise.race([
+      loadShared(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('La base de données ne répond pas (délai de 25 s dépassé).')), 25000))
+    ]);
+  }catch(e){
+    showBootError(e && e.message ? e.message : e);
+    return;
+  }
   let session = null;
   try{ session = localStorage.getItem('prono_session'); }catch(e){ session = null; }
   document.getElementById('loadingScreen').style.display = 'none';
