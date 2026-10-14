@@ -143,6 +143,12 @@
   .bo-actions button{flex:1;}
   .locked-badge{font-size:11px;color:var(--muted);margin-top:4px;}
   .gate-note{font-size:12.5px;color:var(--muted);text-align:center;padding:20px;}
+
+  .avatar{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:50%;object-fit:cover;color:#fff;font-weight:800;}
+  .lb-name{display:inline-flex;align-items:center;gap:8px;}
+  .who-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
+  .avatar-edit{position:relative;cursor:pointer;border-radius:50%;line-height:0;}
+  .avatar-edit::after{content:'+';position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:var(--gold);color:var(--ink);font-size:12px;font-weight:800;line-height:15px;text-align:center;}
 </style>
 </head>
 <body>
@@ -179,7 +185,12 @@
       </div>
       <div class="who">
         <p style="margin:0 0 6px;font-size:12.5px;opacity:0.85;">Ligue des Champions 2026/27</p>
-        <span class="name" id="whoName"></span>
+        <div class="who-row">
+          <div class="avatar-edit" id="whoAvatar" role="button" tabindex="0" aria-label="Changer ma photo de profil" onclick="document.getElementById('avatarInput').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('avatarInput').click();}"></div>
+          <span class="name" id="whoName"></span>
+        </div>
+        <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="handleAvatarFile(this)">
+        <div class="msg" id="avatarMsg" style="color:#fff;text-align:right;min-height:0;margin-top:2px;font-size:11.5px;"></div>
         <button onclick="logout()">Déconnexion</button>
       </div>
     </div>
@@ -394,8 +405,8 @@ const ADMIN_CODE = 'PsgLuna2026';
 // bon (elle ne "glisse" pas vers le match suivant).
 function bonusDeadlineKickoff(){
   const target = (MATCHES || []).find(m =>
-    (m.home === 'PSG' && /manchester city/i.test(m.away)) ||
-    (m.away === 'PSG' && /manchester city/i.test(m.home))
+    (m.home === 'PSG' && /man(chester)?\.?\s*city/i.test(m.away)) ||
+    (m.away === 'PSG' && /man(chester)?\.?\s*city/i.test(m.home))
   );
   return target ? new Date(target.kickoff) : null;
 }
@@ -406,7 +417,7 @@ function isBonusLocked(){
 }
 function fmtBonusDeadline(){
   const deadline = bonusDeadlineKickoff();
-  if(!deadline) return 'le coup d\'envoi de Manchester City - PSG';
+  if(!deadline) return 'coup d\'envoi de Manchester City - PSG';
   const day = deadline.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
   const time = deadline.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
   return `${day} à ${time}`;
@@ -420,6 +431,7 @@ let clTeams = [];
 let teamCrests = {};
 let scorerOverrides = {};
 let topScorers = [];
+let avatars = {};
 let predictions = {};
 let bonuses = {};
 let finalResults = {champion:'', scorer:''};
@@ -457,6 +469,67 @@ function fmtKickoff(iso){
   const h = String(d.getHours()).padStart(2,'0');
   const m = String(d.getMinutes()).padStart(2,'0');
   return `${day} — ${h}h${m}`;
+}
+
+function avatarHtml(name, size){
+  const s = size || 28;
+  const src = avatars[name];
+  if(src){
+    return `<img class="avatar" src="${src}" alt="" width="${s}" height="${s}" style="width:${s}px;height:${s}px;">`;
+  }
+  let h = 0;
+  for(let i=0;i<name.length;i++){ h = (h*31 + name.charCodeAt(i)) % 360; }
+  const initial = (name.trim()[0] || '?').toUpperCase().replace(/[&<>"']/g, '?');
+  return `<span class="avatar" style="width:${s}px;height:${s}px;background:hsl(${h},45%,38%);font-size:${Math.round(s*0.45)}px;">${initial}</span>`;
+}
+
+function renderHeaderAvatar(){
+  const el = document.getElementById('whoAvatar');
+  if(el && currentName) el.innerHTML = avatarHtml(currentName, 40);
+}
+
+// Recadre l'image en carré et la réduit (ex : 128 px) en JPEG, pour que
+// l'avatar pèse quelques Ko seulement et tienne dans Firestore.
+function resizeImageToDataUrl(file, size){
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      try{
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const side = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - side) / 2;
+        const sy = (img.naturalHeight - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      }catch(e){ reject(e); }
+      finally{ URL.revokeObjectURL(url); }
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('image illisible')); };
+    img.src = url;
+  });
+}
+
+async function handleAvatarFile(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  const msg = document.getElementById('avatarMsg');
+  if(!file || !currentName) return;
+  if(!file.type.startsWith('image/')){ msg.textContent = 'Choisis une image.'; return; }
+  msg.textContent = 'Envoi…';
+  try{
+    const dataUrl = await resizeImageToDataUrl(file, 128);
+    await fsSet('avatar:'+currentName, dataUrl);
+    avatars[currentName] = dataUrl;
+    renderHeaderAvatar();
+    renderLeaderboard();
+    msg.textContent = 'Photo mise à jour !';
+  }catch(e){
+    msg.textContent = "Impossible d'utiliser cette photo.";
+  }
+  setTimeout(()=>{ msg.textContent=''; }, 2500);
 }
 
 async function init(){
@@ -502,6 +575,14 @@ async function loadShared(){
   catch(e){ players = []; }
   try{ const fr = await fsGet('finalResults'); finalResults = fr ? JSON.parse(fr) : {champion:'', scorer:''}; }
   catch(e){ finalResults = {champion:'', scorer:''}; }
+
+  avatars = {};
+  await Promise.all(players.map(async name=>{
+    try{
+      const a = await fsGet('avatar:'+name);
+      if(a && /^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(a)) avatars[name] = a;
+    }catch(e){}
+  }));
 
   predictions = {}; bonuses = {};
   for(const name of players){
@@ -602,6 +683,7 @@ function enterApp(){
   document.getElementById('app').style.display = 'block';
   document.getElementById('tabbar').style.display = 'flex';
   document.getElementById('whoName').textContent = currentName;
+  renderHeaderAvatar();
   populateTeamSelect(document.getElementById('bonusChampion'), bonuses[currentName] ? bonuses[currentName].champion : '');
   populateScorerSelect(document.getElementById('bonusScorer'), bonuses[currentName] ? bonuses[currentName].scorer : '');
   const locked = isBonusLocked();
@@ -858,7 +940,7 @@ function renderLeaderboard(){
   rows.forEach((r)=>{
     html += `<tr class="${r.rank===1 ? 'top1' : ''}">
       <td class="rank">${r.rank}</td>
-      <td class="name">${r.name}${r.rank===1 ? ' 🏆' : ''}</td>
+      <td class="name"><span class="lb-name">${avatarHtml(r.name, 28)}<span>${r.name}${r.rank===1 ? ' 🏆' : ''}</span></span></td>
       <td class="picks">Vainqueur : ${r.champion}${r.bonusHit.includes('vainqueur') ? ' ✅' : ''}<br>Buteur : ${r.scorer}${r.bonusHit.includes('buteur') ? ' ✅' : ''}</td>
       <td class="pts">${r.pts}</td>
     </tr>`;
