@@ -332,6 +332,8 @@
           </div>
           <button onclick="boResetPassword()">Réinitialiser</button>
           <div class="msg" id="boResetMsg"></div>
+          <button class="danger" id="boDeletePlayerBtn" style="margin-top:14px;" onclick="boDeletePlayer()">Supprimer ce joueur</button>
+          <div class="msg" id="boDeleteMsg"></div>
         </div>
 
         <div class="section-title">Ajouter un match</div>
@@ -1164,6 +1166,37 @@ async function boResetPassword(){
   }catch(e){
     msg.textContent = "Erreur : " + (e && e.message ? e.message : 'inconnue');
   }
+}
+
+let pendingDeletePlayer = null;
+async function boDeletePlayer(){
+  const name = document.getElementById('boResetPlayer').value;
+  const msg = document.getElementById('boDeleteMsg');
+  const btn = document.getElementById('boDeletePlayerBtn');
+  if(!name){ msg.textContent = 'Aucun joueur sélectionné.'; return; }
+  if(pendingDeletePlayer !== name){
+    pendingDeletePlayer = name;
+    btn.textContent = `Confirmer : supprimer ${name} ?`;
+    msg.textContent = 'Ses pronostics et son compte seront effacés. Clique encore pour confirmer.';
+    return;
+  }
+  pendingDeletePlayer = null;
+  btn.textContent = 'Supprimer ce joueur';
+  try{
+    players = players.filter(p => p !== name);
+    await fsSet('players', JSON.stringify(players));
+    await fsDelete('user:' + name.toLowerCase());
+    await fsDelete('bonus:' + name);
+    await fsDelete('avatar:' + name);
+    for(const m of MATCHES){ await fsDelete('pred:' + name + ':' + m.id); delete predictions[name+'|'+m.id]; }
+    delete bonuses[name]; delete avatars[name];
+    msg.textContent = `${name} a été supprimé.`;
+  }catch(e){
+    msg.textContent = 'Erreur : ' + (e && e.message ? e.message : 'inconnue');
+  }
+  renderBackoffice();
+  renderLeaderboard();
+  renderMatches();
 }
 
 async function boAddMatch(){
