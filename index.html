@@ -126,6 +126,21 @@
   table.leader td.name{font-weight:700;}
   table.leader td.picks{font-size:12px;color:var(--muted);line-height:1.5;}
   table.leader td.rank{text-align:center;}
+  table.leader tbody tr{cursor:pointer;}
+  .ptbadge{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:800;}
+  .pt-gold{background:#FFF1BF;color:#7A5800;} .pt-silver{background:#E6E9EF;color:#4A5568;}
+  .pt-green{background:#DDF3E6;color:#13763A;} .pt-red{background:#FDE3E6;color:#B00E20;}
+  .card.bd-gold{border-left:5px solid #E8B100;} .card.bd-silver{border-left:5px solid #A9B2C0;}
+  .card.bd-green{border-left:5px solid #1a9d4b;} .card.bd-red{border-left:5px solid #DA1128;}
+  #playerSheet{position:fixed;inset:0;background:var(--bg);z-index:30;overflow-y:auto;display:none;padding:14px 16px 50px;}
+  #playerSheet .inner{max-width:560px;margin:0 auto;}
+  .ps-hero{text-align:center;margin:8px 0 14px;}
+  .ps-hero .avatar{border-radius:50%;object-fit:cover;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:800;}
+  .ps-hero h2{margin:10px 0 2px;font-size:22px;}
+  .ps-hero .sub{color:var(--muted);font-size:14px;}
+  .ps-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:14px;}
+  .ps-legend{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px;}
+  .ps-legend .ptbadge{margin-top:0;font-size:11px;}
   .mv{font-size:10.5px;font-weight:800;line-height:1.2;margin-top:2px;}
   .mv.up{color:#1a9d4b;} .mv.down{color:var(--red);} .mv.same{color:var(--muted);}
   .gain{font-size:11px;font-weight:800;color:#1a9d4b;line-height:1.2;margin-top:2px;}
@@ -369,6 +384,8 @@
     </div>
   </div>
 </div>
+
+<div id="playerSheet"><div class="inner" id="playerSheetBody"></div></div>
 
 <div class="tabbar" id="tabbar" style="display:none;">
   <button id="tab-pronos" class="active" onclick="showView('pronos')">Pronostics</button>
@@ -899,6 +916,10 @@ function renderMatches(){
       html += `<span class="locked-tag">Verrouillé — coup d'envoi passé</span>`;
       html += `<div style="margin-top:8px;font-size:12px;color:var(--muted);">Le score sera ajouté par l'organisateur.</div>`;
     }
+    if(final && locked){
+      html += `<div>${ptBadgeHtml(myPred, final, !!liveStatus[m.id])}</div>`;
+      div.className = 'card bd-' + ptsClass(myPred ? pointsForMatch(myPred, final) : 0);
+    }
     div.innerHTML = html;
     el.appendChild(div);
   }
@@ -1002,6 +1023,76 @@ async function boToggleScorerOverride(name, checked){
   renderLeaderboard();
 }
 
+function ptsClass(pts){ return pts >= 3 ? 'gold' : pts >= 1.5 ? 'silver' : pts >= 1 ? 'green' : 'red'; }
+function ptsLabel(pts, hasPred){
+  if(!hasPred) return 'Pas de prono · 0 pt';
+  if(pts >= 3) return '🥇 Score exact · +3';
+  if(pts >= 1.5) return '🥈 Bonne différence de buts · +1,5';
+  if(pts >= 1) return '🟢 Bon résultat · +1';
+  return '🔴 Raté · 0 pt';
+}
+function ptBadgeHtml(pred, final, isLive){
+  const pts = pred ? pointsForMatch(pred, final) : 0;
+  return `<span class="ptbadge pt-${ptsClass(pred ? pts : 0)}">${ptsLabel(pts, !!pred)}${isLive ? ' (provisoire)' : ''}</span>`;
+}
+function legendHtml(){
+  return `<div class="ps-legend"><span class="ptbadge pt-gold">Or : score exact</span><span class="ptbadge pt-silver">Argent : bonne différence</span><span class="ptbadge pt-green">Vert : bon résultat</span><span class="ptbadge pt-red">Rouge : raté</span></div>`;
+}
+let sheetPlayer = null;
+function openPlayer(name){
+  sheetPlayer = name;
+  renderPlayerSheet();
+  const el = document.getElementById('playerSheet');
+  el.style.display = 'block'; el.scrollTop = 0;
+}
+function closePlayer(){ sheetPlayer = null; document.getElementById('playerSheet').style.display = 'none'; }
+function renderPlayerSheet(){
+  if(!sheetPlayer) return;
+  const name = sheetPlayer;
+  const row = (window.lastLbRows || []).find(r => r.name === name);
+  const own = name === currentName;
+  const b = bonuses[name] || {};
+  const bonusOpen = own || isBonusLocked();
+  let history = '';
+  const list = (MATCHES||[]).slice().sort((a,c)=> c.kickoff.localeCompare(a.kickoff));
+  for(const m of list){
+    const {locked, final} = isLocked(m);
+    if(!locked && !own) continue;
+    const pred = predictions[name+'|'+m.id];
+    const isLive = !!liveStatus[m.id];
+    const predTxt = pred ? `${pred.h} - ${pred.a}` : '—';
+    let badge = '', cls = '';
+    if(final && locked){ const pts = pred ? pointsForMatch(pred, final) : 0; cls = ' bd-'+ptsClass(pred ? pts : 0); badge = ptBadgeHtml(pred, final, isLive); }
+    history += `<div class="card${cls}">
+      <div class="date">${fmtKickoff(m.kickoff)}</div>
+      <div class="teams"><span class="team-side">${teamBadge(m.home)}${m.home}</span><span class="vs">vs</span><span class="team-side">${teamBadge(m.away)}${m.away}</span></div>
+      <div class="ps-row"><span>Prono</span><b>${predTxt}</b></div>
+      ${final ? `<div class="ps-row"><span>${isLive ? 'Score en direct' : 'Score final'}</span><b>${final.h} - ${final.a}</b></div>` : ''}
+      ${badge}
+    </div>`;
+  }
+  if(!history) history = '<div class="empty">Aucun match joué pour le moment.</div>';
+  const hitWin = row && row.bonusHit.includes('vainqueur') ? ' ✅' : '';
+  const hitScorer = row && row.bonusHit.includes('buteur') ? ' ✅' : '';
+  document.getElementById('playerSheetBody').innerHTML = `
+    <button class="small ghost" onclick="closePlayer()">← Retour au classement</button>
+    <div class="ps-hero">
+      ${avatarHtml(name, 112)}
+      <h2>${name}${row && row.rank===1 ? ' 🏆' : ''}</h2>
+      <div class="sub">${row ? `${row.rank}${row.rank===1?'er':'e'} · ${row.pts} pt${row.pts>1?'s':''}` : ''}</div>
+    </div>
+    <div class="section-title">Pronos bonus</div>
+    <div class="card">
+      ${bonusOpen
+        ? `<div class="ps-row"><span>Vainqueur de la LDC</span><b>${b.champion || '—'}${hitWin}</b></div>
+           <div class="ps-row"><span>Meilleur buteur</span><b>${b.scorer || '—'}${hitScorer}</b></div>`
+        : `<div style="font-size:13px;color:var(--muted);">Cachés jusqu'à la date limite des pronos bonus.</div>`}
+    </div>
+    <div class="section-title">Historique des pronos</div>
+    ${legendHtml()}
+    ${history}`;
+}
+
 function moveHtml(r, showMoves){
   if(!showMoves || r.baseRank === undefined) return '';
   const d = r.baseRank - r.rank;
@@ -1076,7 +1167,7 @@ function renderLeaderboard(){
     <th></th><th>Joueur</th>${curMatches.length ? '<th>Prono du match</th>' : ''}<th>Pronos bonus</th><th style="text-align:right;">Pts</th>
   </tr></thead><tbody>`;
   rows.forEach((r)=>{
-    html += `<tr class="${r.rank===1 ? 'top1' : ''}">
+    html += `<tr class="${r.rank===1 ? 'top1' : ''}" onclick="openPlayer(decodeURIComponent('${encodeURIComponent(r.name).replace(/'/g,'%27')}'))">
       <td class="rank">${r.rank}${moveHtml(r, showMoves)}</td>
       <td class="name"><span class="lb-name">${avatarHtml(r.name, 28)}<span>${r.name}${r.rank===1 ? ' 🏆' : ''}</span></span></td>
       ${curMatches.length ? `<td class="livepick">${curMatches.map(m=>{ const pr = predictions[r.name+'|'+m.id]; return pr ? `<b>${pr.h} - ${pr.a}</b>` : '<span style="color:var(--muted);">—</span>'; }).join('<br>')}</td>` : ''}
@@ -1085,7 +1176,10 @@ function renderLeaderboard(){
     </tr>`;
   });
   html += '</tbody></table>';
+  html += '<div style="font-size:11.5px;color:var(--muted);margin-top:8px;text-align:center;">Touche un joueur pour voir son historique.</div>';
   el.innerHTML = html;
+  window.lastLbRows = rows;
+  renderPlayerSheet();
 }
 
 function unlockBackoffice(){
