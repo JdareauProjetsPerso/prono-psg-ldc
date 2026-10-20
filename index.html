@@ -125,6 +125,11 @@
   tr.top1 td.rank{color:var(--gold);}
   table.leader td.name{font-weight:700;}
   table.leader td.picks{font-size:12px;color:var(--muted);line-height:1.5;}
+  table.leader td.rank{text-align:center;}
+  .mv{font-size:10.5px;font-weight:800;line-height:1.2;margin-top:2px;}
+  .mv.up{color:#1a9d4b;} .mv.down{color:var(--red);} .mv.same{color:var(--muted);}
+  .gain{font-size:11px;font-weight:800;color:#1a9d4b;line-height:1.2;margin-top:2px;}
+  .gain.zero{color:var(--muted);font-weight:600;}
   table.leader td.livepick{font-size:14px;white-space:nowrap;}
   table.leader td.pts{font-weight:800;text-align:right;color:var(--green-deep);white-space:nowrap;}
   .empty{font-size:13.5px;color:var(--muted);padding:16px 4px;text-align:center;}
@@ -319,6 +324,18 @@
         </div>
 
         <div id="boMatches"></div>
+
+        <div class="section-title">Robot des scores</div>
+        <div class="card">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">À lancer une fois en début de match : le robot met alors le score à jour toutes les minutes pendant 2h50.</div>
+          <button id="boRobotBtn" onclick="boLaunchRobot()">Lancer le robot (2h50)</button>
+          <div class="msg" id="boRobotMsg"></div>
+          <div class="field" id="boTokenField" style="margin-top:14px;display:none;">
+            <label>Jeton GitHub (à saisir une seule fois, gardé sur ce téléphone)</label>
+            <input type="password" id="boTokenInput" placeholder="github_pat_…">
+            <button class="small ghost" style="margin-top:8px;" onclick="boSaveToken()">Enregistrer le jeton</button>
+          </div>
+        </div>
 
         <div class="section-title">Réinitialiser un mot de passe</div>
         <div class="card">
@@ -767,6 +784,10 @@ function enterApp(){
   renderMatches();
   renderLeaderboard();
   startLiveRefresh();
+  // Après un rafraîchissement, on revient sur l'onglet où on était.
+  let wanted = (location.hash||'').replace('#','');
+  if(!VALID_VIEWS.includes(wanted)){ try{ wanted = sessionStorage.getItem('lastView') || localStorage.getItem('lastView') || ''; }catch(e){ wanted=''; } }
+  if(VALID_VIEWS.includes(wanted) && wanted !== 'pronos') showView(wanted);
 }
 
 let liveRefreshTimer = null;
@@ -780,7 +801,11 @@ function startLiveRefresh(){
   }, 60000);
 }
 
+const VALID_VIEWS = ['pronos','classement','regles','backoffice'];
 function showView(v){
+  try{ history.replaceState(null,'','#'+v); }catch(e){}
+  try{ sessionStorage.setItem('lastView', v); }catch(e){}
+  try{ localStorage.setItem('lastView', v); }catch(e){}
   document.getElementById('view-pronos').classList.toggle('active', v==='pronos');
   document.getElementById('view-classement').classList.toggle('active', v==='classement');
   document.getElementById('view-regles').classList.toggle('active', v==='regles');
@@ -977,6 +1002,18 @@ async function boToggleScorerOverride(name, checked){
   renderLeaderboard();
 }
 
+function moveHtml(r, showMoves){
+  if(!showMoves || r.baseRank === undefined) return '';
+  const d = r.baseRank - r.rank;
+  if(d > 0) return `<div class="mv up">▲${d}</div>`;
+  if(d < 0) return `<div class="mv down">▼${-d}</div>`;
+  return '<div class="mv same">=</div>';
+}
+function gainHtml(r, lastScored){
+  if(!lastScored || r.gain === undefined) return '';
+  return r.gain > 0 ? `<div class="gain">+${r.gain}</div>` : '<div class="gain zero">+0</div>';
+}
+
 function renderLeaderboard(){
   const el = document.getElementById('leaderboard');
   if(players.length === 0){
@@ -1001,6 +1038,17 @@ function renderLeaderboard(){
     }
     return {name, pts, champion: b.champion || '—', scorer: b.scorer || '—', bonusHit};
   });
+  // Évolution : on compare au classement d'avant le dernier match dont le
+  // score est connu (en direct ou terminé).
+  const scoredMatches = (MATCHES||[]).filter(m => scores[m.id]).slice().sort((a,b)=> a.kickoff.localeCompare(b.kickoff));
+  const lastScored = scoredMatches.length ? scoredMatches[scoredMatches.length-1] : null;
+  const showMoves = scoredMatches.length >= 2;
+  if(lastScored){
+    rows.forEach(r=>{ r.gain = pointsForMatch(predictions[r.name+'|'+lastScored.id], scores[lastScored.id]); r.basePts = r.pts - r.gain; });
+    const baseSorted = rows.slice().sort((a,b)=> b.basePts - a.basePts);
+    let br = 0, bp = null;
+    baseSorted.forEach((r,i)=>{ if(bp === null || r.basePts !== bp){ br = i+1; } r.baseRank = br; bp = r.basePts; });
+  }
   rows.sort((a,b)=> b.pts - a.pts);
   // Classement "1,1,3,4..." : les ex-aequo partagent le même rang, et le
   // rang suivant tient compte du nombre de joueurs déjà classés devant.
@@ -1029,11 +1077,11 @@ function renderLeaderboard(){
   </tr></thead><tbody>`;
   rows.forEach((r)=>{
     html += `<tr class="${r.rank===1 ? 'top1' : ''}">
-      <td class="rank">${r.rank}</td>
+      <td class="rank">${r.rank}${moveHtml(r, showMoves)}</td>
       <td class="name"><span class="lb-name">${avatarHtml(r.name, 28)}<span>${r.name}${r.rank===1 ? ' 🏆' : ''}</span></span></td>
       ${curMatches.length ? `<td class="livepick">${curMatches.map(m=>{ const pr = predictions[r.name+'|'+m.id]; return pr ? `<b>${pr.h} - ${pr.a}</b>` : '<span style="color:var(--muted);">—</span>'; }).join('<br>')}</td>` : ''}
       <td class="picks">Vainqueur : ${r.champion}${r.bonusHit.includes('vainqueur') ? ' ✅' : ''}<br>Buteur : ${r.scorer}${r.bonusHit.includes('buteur') ? ' ✅' : ''}</td>
-      <td class="pts">${r.pts}</td>
+      <td class="pts">${r.pts}${gainHtml(r, lastScored)}</td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -1166,6 +1214,42 @@ async function boResetPassword(){
   }catch(e){
     msg.textContent = "Erreur : " + (e && e.message ? e.message : 'inconnue');
   }
+}
+
+const GH_REPO = 'JdareauProjetsPerso/prono-psg-ldc';
+function boTokenGet(){ try{ return localStorage.getItem('gh_robot_token') || ''; }catch(e){ return ''; } }
+function boSaveToken(){
+  const v = document.getElementById('boTokenInput').value.trim();
+  const msg = document.getElementById('boRobotMsg');
+  if(!v){ msg.textContent = 'Colle ton jeton GitHub.'; return; }
+  try{ localStorage.setItem('gh_robot_token', v); }catch(e){ msg.textContent = "Impossible d'enregistrer le jeton ici (navigation privée ?). Il faudra le recoller à chaque fois."; sessionStorage.setItem('gh_robot_token_tmp', v); }
+  document.getElementById('boTokenInput').value = '';
+  document.getElementById('boTokenField').style.display = 'none';
+  msg.textContent = 'Jeton enregistré. Appuie sur « Lancer le robot ».';
+}
+async function boLaunchRobot(){
+  const msg = document.getElementById('boRobotMsg');
+  let token = boTokenGet();
+  if(!token){ try{ token = sessionStorage.getItem('gh_robot_token_tmp') || ''; }catch(e){} }
+  if(!token){
+    document.getElementById('boTokenField').style.display = 'block';
+    msg.textContent = 'Première fois : colle ton jeton GitHub ci-dessous.';
+    return;
+  }
+  msg.textContent = 'Lancement…';
+  try{
+    const res = await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/update-scores.yml/dispatches`, {
+      method:'POST',
+      headers:{ 'Accept':'application/vnd.github+json', 'Authorization':'Bearer '+token, 'X-GitHub-Api-Version':'2022-11-28', 'Content-Type':'application/json' },
+      body: JSON.stringify({ ref:'main', inputs:{ loop_minutes:'170' } })
+    });
+    if(res.status === 204){ msg.textContent = 'Robot lancé ✅ Les scores se mettront à jour toute seule dans 1 à 2 minutes.'; }
+    else if(res.status === 401 || res.status === 403 || res.status === 404){
+      try{ localStorage.removeItem('gh_robot_token'); sessionStorage.removeItem('gh_robot_token_tmp'); }catch(e){}
+      document.getElementById('boTokenField').style.display = 'block';
+      msg.textContent = 'Jeton refusé (erreur ' + res.status + '). Colle un nouveau jeton ci-dessous.';
+    } else { msg.textContent = 'Erreur GitHub ' + res.status + '.'; }
+  }catch(e){ msg.textContent = 'Erreur réseau : ' + (e && e.message ? e.message : 'inconnue'); }
 }
 
 let pendingDeletePlayer = null;
